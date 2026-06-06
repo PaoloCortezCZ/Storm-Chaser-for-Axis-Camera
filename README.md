@@ -1,4 +1,4 @@
-# ⛈ Storm Chaser
+# ⛈ Storm Chaser for Axis IP cameras - Powered by CamScripter ⛈
 
 **Automatically point an Axis IP camera at the strongest nearby storm.**
 
