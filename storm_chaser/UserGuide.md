@@ -1,4 +1,4 @@
-# Storm Chaser — User Guide
+# 🌪️ Storm Chaser — User Guide 🌪️
 
 **Version 4.0.0** · CamScripter microapp for Axis IP cameras
 
