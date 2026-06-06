@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Storm Chaser — Settings</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+  integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+  integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<style>
+  :root {
+    --bg: #eef1f6; --panel: #ffffff; --panel-2: #f4f7fb; --text: #16202b;
+    --muted: #687888; --border: #e2e8f0; --line: #eef2f7;
+    --accent: #2563eb; --accent-2: #1d4ed8; --accent-soft: #eaf1ff;
+    --danger: #dc2626; --ok: #16a34a; --warn: #b45309; --storm: #dc2626;
+    --shadow: 0 1px 2px rgba(16,32,56,.06), 0 4px 16px rgba(16,32,56,.05);
+    --radius: 14px;
+  }
+  [data-theme="dark"] {
+    --bg: #0c1118; --panel: #151c26; --panel-2: #1b2531; --text: #e7eef6;
+    --muted: #95a6b8; --border: #28333f; --line: #222d39;
+    --accent: #5b9bff; --accent-2: #7db0ff; --accent-soft: #16263f;
+    --danger: #ff6b61; --ok: #45d483; --warn: #ffc04d; --storm: #ff6b61;
+    --shadow: 0 1px 2px rgba(0,0,0,.3), 0 6px 20px rgba(0,0,0,.35);
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+
+  header { display: flex; align-items: center; gap: 14px; padding: 14px 22px;
+    background: var(--panel); border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 20; box-shadow: 0 1px 2px rgba(16,32,56,.04); }
+  .brand-badge { width: 34px; height: 34px; border-radius: 10px; flex: 0 0 auto;
+    background: linear-gradient(135deg, var(--accent), #4f46e5); color: #fff;
+    display: flex; align-items: center; justify-content: center; font-size: 18px;
+    box-shadow: 0 2px 6px rgba(37,99,235,.4); }
+  header h1 { font-size: 16px; font-weight: 700; margin: 0; flex: 1; letter-spacing: -.01em; }
+  header .sub { color: var(--muted); font-size: 12px; font-weight: 500; }
+
+  .wrap { max-width: 100%; margin: 0; padding: 18px 22px 84px; }
+  /* Settings on the left as a tight masonry; map + log pinned on the right.
+     Capped + centered so ultrawide monitors don't leave a huge middle gap. */
+  .layout { display: flex; gap: 18px; align-items: flex-start; max-width: 1640px; margin: 0 auto; }
+  .cards { flex: 1 1 auto; min-width: 0; column-width: 330px; column-gap: 18px; }
+  .cards > .card { break-inside: avoid; -webkit-column-break-inside: avoid;
+    display: inline-block; width: 100%; margin: 0 0 18px; }
+  .monitor { flex: 0 0 540px; position: sticky; top: 62px; display: flex; flex-direction: column; gap: 18px; }
+  .monitor > .card { margin: 0; }
+  .monitor #map { height: 380px; }
+  @media (max-width: 1180px) {
+    .layout { flex-direction: column; }
+    .monitor { position: static; flex: 1 1 auto; width: 100%; }
+  }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 18px 18px 20px; box-shadow: var(--shadow); }
+  .card h2 { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em;
+    color: var(--muted); margin: 0 0 16px; padding-bottom: 11px; border-bottom: 1px solid var(--line);
+    display: flex; align-items: center; gap: 8px; }
+  .infobtn { flex: 0 0 auto; width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--panel-2); color: var(--accent); font: italic 700 11px Georgia, serif; cursor: pointer;
+    display: inline-flex; align-items: center; justify-content: center; padding: 0; line-height: 1;
+    text-transform: none; transition: .15s; }
+  .infobtn:hover { background: var(--accent); color: #fff; border-color: var(--accent); transform: scale(1.1); }
+  .cardinfo { display: none; background: var(--accent-soft);
+    border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0;
+    padding: 11px 13px; margin: 0 0 16px; font-size: 12.5px; line-height: 1.6; color: var(--text); }
+  .cardinfo.open { display: block; }
+  .cardinfo b { color: var(--text); font-weight: 600; }
+  .cardinfo p { margin: 6px 0; }
+  .cardinfo ul { margin: 6px 0; padding-left: 18px; }
+  .cardinfo li { margin: 3px 0; }
+  .cardinfo code { background: var(--panel-2); padding: 1px 5px; border-radius: 4px; font-size: 11.5px; }
+
+  label { display: block; font-size: 11px; font-weight: 600; color: var(--muted);
+    margin: 12px 0 5px; letter-spacing: .02em; }
+  input, select, textarea { width: 100%; padding: 9px 11px; border: 1px solid var(--border);
+    border-radius: 9px; background: var(--panel-2); color: var(--text); font-size: 13.5px;
+    box-sizing: border-box; font-family: inherit; transition: border-color .12s, box-shadow .12s, background .12s; }
+  input::placeholder, textarea::placeholder { color: var(--muted); opacity: .65; }
+  input:hover, select:hover, textarea:hover { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+  textarea { resize: vertical; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 12px; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); background: var(--panel); }
+  select { appearance: none; background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23687888' stroke-width='3'><path d='M6 9l6 6 6-6'/></svg>");
+    background-repeat: no-repeat; background-position: right 11px center; padding-right: 30px; cursor: pointer; }
+  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+  .check { display: flex; align-items: center; gap: 8px; margin: 10px 0; }
+  .check input { width: auto; accent-color: var(--accent); }
+
+  .btn { border: 0; border-radius: 9px; padding: 10px 16px; font-size: 13.5px; font-weight: 600;
+    cursor: pointer; background: var(--accent); color: #fff; transition: .14s; letter-spacing: .01em; }
+  .btn:hover { background: var(--accent-2); box-shadow: 0 3px 10px rgba(37,99,235,.3); }
+  .btn:active { transform: translateY(1px); }
+  .btn.ghost { background: var(--panel); color: var(--accent); border: 1px solid var(--border); }
+  .btn.ghost:hover { background: var(--accent-soft); border-color: var(--accent); box-shadow: none; }
+  .btn.sm { padding: 7px 12px; font-size: 12.5px; }
+
+  .bar { position: fixed; bottom: 0; left: 0; right: 0; background: color-mix(in srgb, var(--panel) 92%, transparent);
+    backdrop-filter: blur(8px); border-top: 1px solid var(--border); padding: 12px 22px; display: flex; gap: 10px;
+    align-items: center; z-index: 20; box-shadow: 0 -2px 12px rgba(16,32,56,.06); }
+  .bar .msg { flex: 1; font-size: 13px; color: var(--muted); font-weight: 500; }
+
+  .pill { padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: .03em; }
+  .pill.on { background: color-mix(in srgb, var(--ok) 16%, transparent); color: var(--ok); }
+  .pill.off { background: color-mix(in srgb, var(--danger) 16%, transparent); color: var(--danger); }
+  .hint { font-size: 11.5px; color: var(--muted); margin-top: 5px; line-height: 1.5; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 4px; }
+  th, td { text-align: left; padding: 7px 8px; border-bottom: 1px solid var(--line); }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover td { background: var(--panel-2); }
+  th { color: var(--muted); font-weight: 700; font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; }
+
+  pre { background: var(--panel-2); border: 1px solid var(--border); border-radius: 9px;
+    padding: 12px; max-height: 220px; overflow-y: auto; overflow-x: hidden; font-size: 12px; margin: 0;
+    white-space: pre-wrap; word-break: break-word; overflow-wrap: anywhere; line-height: 1.5; }
+  .compass-wrap { display: flex; justify-content: center; }
+  .status-line { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; }
+  .status-line > span { background: var(--panel-2); border: 1px solid var(--line);
+    padding: 5px 10px; border-radius: 8px; color: var(--muted); }
+  .status-line b { color: var(--text); font-weight: 700; }
+  .switch { cursor: pointer; border: 1px solid var(--border); background: var(--panel-2);
+    border-radius: 999px; padding: 6px 14px; font-size: 12px; font-weight: 600; color: var(--text); transition: .14s; }
+  .switch:hover { border-color: var(--accent); }
+
+  /* Segmented control (targeting mode) — all options visible in a row. */
+  .segmented { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+  .seg { flex: 1 1 160px; text-align: left; cursor: pointer; border: 1px solid var(--border);
+    background: var(--panel-2); border-radius: 10px; padding: 10px 12px; color: var(--text);
+    transition: .14s; font-family: inherit; }
+  .seg:hover { border-color: var(--accent); }
+  .seg.active { border-color: var(--accent); background: var(--accent-soft);
+    box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent) inset; }
+  .seg .seg-t { display: block; font-weight: 700; font-size: 13px; }
+  .seg .seg-d { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .seg.active .seg-t { color: var(--accent); }
+
+  /* Emphasis for the strongest / followed storm dot. */
+  @keyframes stormPulse {
+    0%   { box-shadow: 0 0 0 0 rgba(217,52,43,.65); }
+    70%  { box-shadow: 0 0 0 12px rgba(217,52,43,0); }
+    100% { box-shadow: 0 0 0 0 rgba(217,52,43,0); }
+  }
+  .storm-active { animation: stormPulse 1.6s ease-out infinite; }
+
+  /* CamSwitcher view rows — clean bordered mini-panels with a color accent. */
+  .csrow { display: grid; grid-template-columns: auto 78px 1fr; gap: 10px; align-items: end;
+    background: var(--panel-2); border: 1px solid var(--border); border-left-width: 4px;
+    border-radius: 10px; padding: 10px 12px; margin: 8px 0; }
+  .csrow .csswatch { width: 12px; height: 12px; border-radius: 3px; align-self: center; }
+  .csrow label { margin-top: 0; }
+  .csrow input, .csrow select { font-size: 12.5px; padding: 7px 9px; }
+  .csrow .csurl { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 11px; margin-top: 5px; }
+  @media (max-width: 460px) { .csrow { grid-template-columns: auto 1fr; } .csrow .csbear { grid-column: 2; } }
+</style>
+</head>
+<body>
+<header>
+  <span class="brand-badge">⛈</span>
+  <h1>Storm Chaser <span class="sub">— CamSwitcher &amp; Axis Cam PTZ preset auto-aim</span></h1>
+  <span id="runPill" class="pill off">…</span>
+  <button id="themeToggle" class="switch" type="button">🌙 Dark</button>
+</header>
+
+<div class="wrap">
+  <div class="layout">
+   <div class="cards">
+
+    <div class="card">
+      <h2>Camera connection <button class="infobtn" type="button" aria-label="info">i</button></h2>
+      <div class="cardinfo">
+        <p>How Storm Chaser reaches your camera. <b>Local</b>: enter the camera IP, user and password (modern Axis cameras use digest auth, handled automatically). <b>Cloud</b>: tick "Use CamStreamer Cloud" and paste the device-connect.net URL + access token instead — useful when the camera isn't on your LAN.</p>
+        <p><b>PTZ camera channel</b> selects which video channel / view area the PTZ preset commands target (1 for most cameras).</p>
+      </div>
+      <div class="check"><input type="checkbox" id="enabled"><label for="enabled" style="margin:0">App enabled</label></div>
+      <label>Camera IP</label><input id="camera_ip" />
+      <div class="row">
+        <div><label>User</label><input id="camera_user" /></div>
+        <div><label>Password</label><input id="camera_pass" type="password" /></div>
+      </div>
+      <div class="check"><input type="checkbox" id="use_cloud"><label for="use_cloud" style="margin:0">Use CamStreamer Cloud access</label></div>
+      <label>Cloud URL</label><input id="cloud_url" placeholder="https://...device-connect.net/..." />
+      <label>Device access token</label><input id="device_access_token" />
+      <div style="margin-top:14px;border-top:1px solid var(--border);padding-top:12px">
+        <button class="btn sm" id="fetchPresetsBtn" type="button">⟳ Fetch view areas &amp; presets</button>
+        <span id="presetFetchMsg" class="hint" style="margin-left:8px"></span>
+        <div id="viewAreaWrap" style="display:none;margin-top:10px">
+          <label>View area (PTZ channel)</label>
+          <select id="viewarea_select"></select>
+          <div id="presetList" class="hint" style="margin-top:8px"></div>
+          <p class="hint">Choosing a view area fills the PTZ channel, preset count and first preset # below.</p>
+        </div>
+        <label style="margin-top:10px">PTZ camera channel</label><input id="ptz_channel" type="number" min="1" />
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Camera location <button class="infobtn" type="button" aria-label="info">i</button></h2>
+      <div class="cardinfo">
+        <p>The geographic spot where the camera is mounted. This is the <b>origin point</b> from which the app measures the compass <b>bearing</b> (direction) and distance to each storm cell. If it's wrong, every direction will be off, so set it as precisely as you can — use the Quick-select for a known site or type exact latitude/longitude.</p>
+        <p>Bearings are degrees clockwise from north: 0°=N, 90°=E, 180°=S, 270°=W.</p>
+      </div>
+      <label>Quick select (Axis Experience Centers & CamStreamer offices)</label>
+      <select id="location_preset"><option value="">— pick a location —</option></select>
+      <label>Location name</label><input id="location_name" />
+      <div class="row">
+        <div><label>Latitude</label><input id="latitude" type="number" step="0.0001" /></div>
+        <div><label>Longitude</label><input id="longitude" type="number" step="0.0001" /></div>
+      </div>
+      <p class="hint">The exact spot the camera is mounted. Storm bearings are computed from here.</p>
+    </div>
+
+    <div class="card">
+      <h2>Preset coverage <button class="infobtn" type="button" aria-label="info">i</button></h2>
+      <div class="cardinfo">
+        <p>How the camera is aimed at the storm.</p>
+        <ul>
+          <li><b>PTZ presets on one view area</b> — for a single PTZ camera. You spread N presets around the compass; the app sends the camera to the preset nearest the storm's bearing.</li>
+          <li><b>CamSwitcher views</b> — switch between different cameras/view areas you set up in CamSwitcher. Give each view the direction it faces; the app activates the view pointing nearest the storm.</li>
+        </ul>
+        <p><b>Coverage 360°</b> = full circle. <b>180°</b> = a one-sided arc (use when the camera/site only sees one half, e.g. coast or wall behind). <b>Arc-center bearing</b> is the direction the middle of that arc points.</p>
+        <p><b>Home preset/view</b> is where it parks when no storm exceeds the trigger threshold (0 = stay put).</p>
+      </div>
+      <label>Targeting mode</label>
+      <input type="hidden" id="target_mode" />
+      <div class="segmented" id="modeSeg">
+        <button type="button" class="seg" data-val="presets">
+          <span class="seg-t">PTZ presets</span><span class="seg-d">rotate presets on one view area</span></button>
+        <button type="button" class="seg" data-val="camswitcher">
+          <span class="seg-t">CamSwitcher views</span><span class="seg-d">switch view / camera per direction</span></button>
+        <button type="button" class="seg" data-val="ptztrack">
+          <span class="seg-t">PTZ tracking</span><span class="seg-d">continuous pan / tilt / zoom</span></button>
+      </div>
+      <div id="ptzModeBox" style="display:none;margin-top:8px">
+        <div class="row">
+          <div><label>Camera faces this bearing at pan 0 (°)</label><input id="ptz_ref_bearing" type="number" min="0" max="359" /></div>
+          <div><label>Fixed tilt (°, 0 = horizon)</label><input id="ptz_tilt" type="number" step="1" /></div>
+        </div>
+        <div class="row3">
+          <div><label>Zoom near (%)</label><input id="ptz_zoom_min_pct" type="number" min="0" max="100" /></div>
+          <div><label>Zoom far (%)</label><input id="ptz_zoom_max_pct" type="number" min="0" max="100" /></div>
+          <div style="display:flex;align-items:flex-end"><label class="check" style="margin:0"><input type="checkbox" id="ptz_pan_flip" style="width:auto;margin-right:6px">Flip pan</label></div>
+        </div>
+        <button class="btn sm ghost" id="readPtzBtn" type="button" style="margin-top:8px">⊕ Read current camera position</button>
+        <span id="ptzPosMsg" class="hint" style="margin-left:8px"></span>
+        <p class="hint">The camera moves to <code>pan = storm bearing − reference</code>, holds your fixed tilt, and zooms between "near" and "far" based on distance (near storms = wide, far = tele). Uses the PTZ channel set under Camera connection. Tick "Flip pan" if it turns the wrong way.</p>
+      </div>
+      <div id="viewareaModeBox" style="display:none;margin-top:8px">
+        <div style="margin-bottom:8px">
+          <button class="btn sm" id="fetchPlaylistsBtn" type="button">⟳ Fetch CamSwitcher playlists</button>
+          <span id="csFetchMsg" class="hint" style="margin-left:8px"></span>
+        </div>
+        <div class="row">
+          <div>
+            <label>Number of views</label>
+            <select id="cs_view_count">
+              <option>1</option><option>2</option><option>3</option><option>4</option><option>5</option>
+            </select>
+          </div>
+          <div>
+            <label>Home view (no storm — optional)</label>
+            <select class="cspick" id="cs_home_pick" data-target="cs_home_url" data-name="cs_home_name" style="display:none;margin-bottom:4px"><option value="">— pick from camera —</option></select>
+            <input id="cs_home_url" placeholder="full URL or playlist_name; blank = hold" />
+            <input type="hidden" id="cs_home_name" />
+          </div>
+        </div>
+        <div id="csViewRows" style="margin-top:6px"></div>
+        <p class="hint">For each view: the compass bearing it faces, and the full CamSwitcher <code>playlist_switch.cgi</code> URL (or just the <code>playlist_name</code>). The storm's direction picks the view with the nearest bearing. Each view has a color shown on the map.</p>
+      </div>
+
+      <div class="row" style="margin-top:10px">
+        <div>
+          <label>Coverage</label>
+          <select id="coverage_deg">
+            <option value="360">360° — full circle</option>
+            <option value="180">180° — one-sided arc</option>
+          </select>
+        </div>
+        <div><label id="centerLabel">North offset (°)</label><input id="center_bearing_deg" type="number" min="0" max="359" /></div>
+      </div>
+
+      <div id="ptzPresetBox" style="display:none;margin-top:8px">
+        <div style="margin-bottom:8px">
+          <button class="btn sm" id="fetchPresetsBtn2" type="button">⟳ Fetch PTZ presets</button>
+          <span id="ppFetchMsg" class="hint" style="margin-left:8px"></span>
+        </div>
+        <div class="row">
+          <div><label>Number of presets (max 8)</label>
+            <select id="pp_count"><option>1</option><option>2</option><option>3</option><option>4</option><option>5</option><option>6</option><option>7</option><option>8</option></select></div>
+          <div><label>Home preset (no storm, 0 = hold)</label><input id="home_preset" type="number" min="0" /></div>
+        </div>
+        <div id="ppRows" style="margin-top:6px"></div>
+        <p class="hint">Choose a view area & fetch (above or here), then assign a camera preset and the bearing it faces to each slot. The storm's direction picks the nearest preset. Each has a color on the map.</p>
+      </div>
+
+      <p class="hint" id="coverageHint"></p>
+    </div>
+
+    <div class="card" id="mapCard">
+      <h2>Map preview — camera, coverage & storms <button class="infobtn" type="button" aria-label="info">i</button></h2>
+      <div class="cardinfo">
+        <p>A live picture of the setup. The blue pin is the camera, the ring is the scan radius, and the colored wedges are each view/preset's sector. The <b style="color:#d9342b">red dot</b> is the storm cell the app currently rates strongest — that's what drives the switch.</p>
+        <p><b>Live storm radar</b> overlays RainViewer precipitation (rain/snow intensity). Note this is raw rainfall — it can differ from the app's red dot, which ranks cells by a storm-intensity score (lightning/CAPE/precip/gusts), not rain alone.</p>
+      </div>
+      <div class="check" style="justify-content:flex-start;gap:16px;flex-wrap:wrap">
+        <span><input type="checkbox" id="radar_toggle" checked><label for="radar_toggle" style="margin:0;display:inline">Live storm radar</label></span>
+        <span><input type="checkbox" id="manual_toggle"><label for="manual_toggle" style="margin:0;display:inline">Manual pick (click a red dot)</label></span>
+        <button class="btn sm ghost" id="recenterBtn" type="button">Recenter</button>
+        <span id="manualHint" class="hint" style="margin:0"></span>
+      </div>
+      <div id="map" style="height:300px;border-radius:10px;border:1px solid var(--border);margin:8px 0;overflow:hidden"></div>
+      <div class="compass-wrap" id="compassFallback" style="display:none"><canvas id="compass" width="240" height="240"></canvas></div>
+      <p class="hint">Blue pin = camera · ring = scan radius · colored wedges = each view/preset's sector · <span style="color:#d9342b;font-weight:700">red dot = the storm cell the app detected as strongest</span> (this is what drives the switch). Note the red dot reflects the intensity score (lightning/CAPE/precip), which may differ from the raw radar rain you see. Radar © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>, map © OpenStreetMap.</p>
+      <table id="presetTable"><thead><tr><th>Preset #</th><th>Center bearing</th><th>Direction</th></tr></thead><tbody></tbody></table>
+    </div>
+
+    <div class="card">
+      <h2>Storm detection <button class="infobtn" type="button" aria-label="info">i</button></h2>
+      <div class="cardinfo">
+        <p>Every scan the app samples weather at a fan of points around the camera (free Open-Meteo data) and scores each for storm strength. The highest-scoring point is the "storm" it chases.</p>
+        <p><b>Scan radius</b> — how far out (km) to look. <b>Rings × Samples/ring</b> — the probe grid density (e.g. 3×16 = 48 points); more = finer detail but a bit slower.</p>
+        <p><b>Intensity score</b> = a weighted blend of four weather variables. Raise a weight to make that factor matter more:</p>
+        <ul>
+          <li><b>Lightning potential</b> (J/kg) — model estimate of how likely/strong lightning is. The most direct "thunderstorm" signal, but only some regional models report it (may be 0 elsewhere).</li>
+          <li><b>CAPE</b> — Convective Available Potential Energy (J/kg): how much "fuel" the atmosphere has for thunderstorms. Rough guide: &lt;1000 weak, 1000–2500 moderate, &gt;2500 strong instability. Weighted low (×0.002) because the numbers are large.</li>
+          <li><b>Precipitation</b> (mm) — current rainfall rate; matches what you see on the radar.</li>
+          <li><b>Wind gusts</b> (km/h) — strong gusts often mark an active storm's leading edge.</li>
+        </ul>
+        <p><b>Intensity trigger threshold</b> — the minimum score before the camera bothers to chase; below it, the camera goes to Home/holds. Raise it to ignore light weather, lower it to react to weaker cells.</p>
+        <p>Tip: to follow the <i>rain you see on radar</i>, increase the precipitation weight and lower lightning/CAPE.</p>
+      </div>
+      <label>Units</label>
+      <select id="unit_system">
+        <option value="imperial">Imperial — miles (mi)</option>
+        <option value="metric">Metric — kilometres (km)</option>
+      </select>
+      <div class="row3">
+        <div><label id="radiusLabel">Scan radius (mi)</label><input id="scan_radius_km" type="number" min="1" /></div>
+        <div><label>Rings</label><input id="scan_rings" type="number" min="1" max="10" /></div>
+        <div><label>Samples / ring</label><input id="samples_per_ring" type="number" min="4" max="72" /></div>
+      </div>
+      <div class="row">
+        <div><label>Intensity trigger threshold</label><input id="intensity_threshold" type="number" step="0.1" /></div>
+        <div><label>Best spots to show (red dots)</label><input id="top_spots" type="number" min="1" max="12" /></div>
+      </div>
+      <p class="hint">Below this score the camera goes to the home preset (or holds). Probe points: <b id="probeCount">—</b> · est. <b id="apiCost">—</b> API calls/day <span id="apiWarn" style="color:var(--danger)"></span></p>
+      <div class="row">
+        <div><label>Weight · lightning potential</label><input id="w_lightning" type="number" step="0.1" /></div>
+        <div><label>Weight · CAPE</label><input id="w_cape" type="number" step="0.001" /></div>
+      </div>
+      <div class="row">
+        <div><label>Weight · precipitation</label><input id="w_precip" type="number" step="0.01" /></div>
+        <div><label>Weight · wind gusts</label><input id="w_gust" type="number" step="0.01" /></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Severe weather alerts — US (NWS) <button class="infobtn" type="button" aria-label="info">i</button></h2>
+      <div class="cardinfo">
+        <p>Adds real <b>National Weather Service</b> warnings as a second source (free, no key, <b>United States only</b>). When enabled, active <b>Tornado / Severe Thunderstorm / Hurricane / Tropical Storm</b> warnings near the camera become high-priority targets — shown as <b style="color:#9333ea">purple dots</b> on the map.</p>
+        <p>With <b>override</b> on, an active WARNING outranks the weather-model storm score, so the camera turns toward the warned area. Watches and weaker alerts rank below warnings. Outside the US, NWS returns nothing — leave this off.</p>
+      </div>
+      <div class="check"><input type="checkbox" id="nws_enabled"><label for="nws_enabled" style="margin:0">Use NWS severe-weather warnings (US)</label></div>
+      <div class="check"><input type="checkbox" id="nws_override"><label for="nws_override" style="margin:0">Warnings override the storm score</label></div>
+      <p class="hint">Source: api.weather.gov · covers tornadoes, severe thunderstorms, hurricanes &amp; tropical storms. For typhoons/cyclones outside US waters there is no free keyless feed.</p>
+    </div>
+
+    <div class="card">
+      <h2>Timing & smoothing <button class="infobtn" type="button" aria-label="info">i</button></h2>
+      <div class="cardinfo">
+        <p>Controls how often it looks and how eagerly it moves.</p>
+        <ul>
+          <li><b>Scan interval</b> — minutes between checks. Set 1–2 for responsive chasing (the underlying weather data itself refreshes about every 10–15 min).</li>
+          <li><b>Min dwell</b> — minimum time to stay on a view before a routine switch, so the camera doesn't flip back and forth constantly.</li>
+          <li><b>Hysteresis</b> — how far (degrees) a storm must move past a sector edge before switching. Prevents jitter when a storm sits right between two views.</li>
+          <li><b>Switch margin</b> — an override: if a clearly stronger storm appears in another sector (this much stronger, e.g. 0.25 = 25%), the camera switches immediately without waiting out the dwell.</li>
+        </ul>
+      </div>
+      <div class="row3">
+        <div><label>Scan interval (min)</label><input id="update_interval_min" type="number" min="1" /></div>
+        <div><label>Min dwell (min)</label><input id="dwell_min" type="number" min="0" /></div>
+        <div><label>Hysteresis (°)</label><input id="hysteresis_deg" type="number" min="0" max="90" /></div>
+      </div>
+      <label>Switch margin (stronger-storm override)</label><input id="switch_margin" type="number" step="0.05" min="0" />
+      <p class="hint">Re-checks every "scan interval" minutes (set 1 for fastest). Dwell + hysteresis stop jitter between adjacent presets; but a storm this much stronger (0.25 = 25%) in another sector overrides the dwell and switches immediately.</p>
+    </div>
+
+    <div class="card">
+      <h2>CamOverlay InfoTicker (optional) <button class="infobtn" type="button" aria-label="info">i</button></h2>
+      <div class="cardinfo">
+        <p>Optionally burn a live status line onto the video via CamOverlay's InfoTicker. Enter the InfoTicker <b>service ID</b> from your CamOverlay config, then write a template using these variables: <code>{status}</code>, <code>{bearing}</code>, <code>{compass}</code>, <code>{distance}</code>, <code>{intensity}</code>, <code>{preset}</code>, <code>{location}</code>, <code>{time}</code>. Leave disabled if you don't use CamOverlay.</p>
+      </div>
+      <div class="check"><input type="checkbox" id="overlay_enabled"><label for="overlay_enabled" style="margin:0">Show live status on overlay</label></div>
+      <label>InfoTicker service ID</label><input id="infoticker_service_id" type="number" min="1" />
+      <label>Template</label><input id="infoticker_template" />
+      <p class="hint">Vars: {status} {bearing} {compass} {distance} {dist_unit} {intensity} {preset} {location} {time}</p>
+    </div>
+
+    <div class="card">
+      <h2>CamOverlay Custom Graphics (optional) <button class="infobtn" type="button" aria-label="info">i</button></h2>
+      <div class="cardinfo">
+        <p>Push each value to a field of a CamOverlay <b>Custom Graphics</b> service (so you can design a styled widget instead of a scrolling line). Enter the service ID, then the <b>field name</b> for each variable you want shown (e.g. <code>field1</code>, <code>field2</code>…). Leave a field blank to skip it. Field names must match those defined in your CamOverlay Custom Graphics layout.</p>
+      </div>
+      <div class="check"><input type="checkbox" id="cg_enabled"><label for="cg_enabled" style="margin:0">Send values to Custom Graphics</label></div>
+      <label>Custom Graphics service ID</label><input id="cg_service_id" type="number" min="1" />
+      <div class="row">
+        <div><label>Status → field</label><input id="cg_field_status" placeholder="field1" /></div>
+        <div><label>Bearing → field</label><input id="cg_field_bearing" placeholder="field2" /></div>
+      </div>
+      <div class="row">
+        <div><label>Compass → field</label><input id="cg_field_compass" placeholder="field3" /></div>
+        <div><label>Distance → field</label><input id="cg_field_distance" placeholder="field4" /></div>
+      </div>
+      <div class="row">
+        <div><label>Dist. unit → field</label><input id="cg_field_dist_unit" placeholder="field5" /></div>
+        <div><label>Intensity → field</label><input id="cg_field_intensity" placeholder="field6" /></div>
+      </div>
+      <div class="row">
+        <div><label>Preset → field</label><input id="cg_field_preset" placeholder="field7" /></div>
+        <div><label>Location → field</label><input id="cg_field_location" placeholder="field8" /></div>
+      </div>
+      <label>Time → field</label><input id="cg_field_time" placeholder="field9" />
+    </div>
+
+    <div class="card" id="statusCard">
+      <h2>Live status <button class="infobtn" type="button" aria-label="info">i</button></h2>
+      <div class="cardinfo">
+        <p>What the app is doing right now. <b>State</b>: tracking (chasing a storm), holding, no storm, or out-of-arc. <b>Preset/View</b>: the currently selected target. <b>Bearing / Distance / Intensity</b>: where the detected storm is and how strong it scored. The log below shows recent scans and PTZ/CamSwitcher actions. "Scan now" forces an immediate re-scan and re-aim.</p>
+      </div>
+      <div class="status-line">
+        <span>State: <b id="st_status">—</b></span>
+        <span>Preset: <b id="st_preset">—</b></span>
+        <span>Bearing: <b id="st_bearing">—</b></span>
+        <span>Distance: <b id="st_dist">—</b></span>
+        <span>Intensity: <b id="st_int">—</b></span>
+      </div>
+      <p class="hint">Last scan: <span id="st_last">—</span> · Next: <span id="st_next">—</span> · Scans: <span id="st_count">0</span> · Source: <b id="st_source">—</b></p>
+      <div style="display:flex;gap:8px;margin:10px 0">
+        <button class="btn sm ghost" id="refreshBtn" type="button">Scan now</button>
+        <button class="btn sm ghost" id="logBtn" type="button">Refresh log</button>
+      </div>
+      <pre id="log">—</pre>
+    </div>
+
+   </div>
+   <aside class="monitor" id="monitor"></aside>
+  </div>
+</div>
+
+<div class="bar">
+  <span class="msg" id="msg">Loading settings…</span>
+  <button class="btn ghost" id="exportBtn" type="button">⭳ Export</button>
+  <button class="btn ghost" id="importBtn" type="button">⭱ Import</button>
+  <input type="file" id="importFile" accept="application/json,.json" style="display:none" />
+  <button class="btn ghost" id="reloadBtn" type="button">Reload</button>
+  <button class="btn" id="saveBtn" type="button">Save & restart</button>
+</div>
+
+<script src="index.js"></script>
+</body>
+</html>

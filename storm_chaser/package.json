@@ -1,0 +1,14 @@
+{
+  "name": "storm-chaser",
+  "version": "3.0.0",
+  "description": "Points an Axis PTZ camera at the strongest nearby storm cell / lightning activity by calling preset positions, using free Open-Meteo data.",
+  "main": "main.js",
+  "scripts": {
+    "create-package": "node node_modules/camstreamerlib/CreatePackage.js -i",
+    "zip:package": "node node_modules/camstreamerlib/CreatePackage.js -i"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "camstreamerlib": "^3.0.0"
+  }
+}

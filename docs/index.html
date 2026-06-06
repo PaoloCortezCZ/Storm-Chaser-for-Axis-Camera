@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Storm Chaser — Axis camera storm auto-aim</title>
+<meta name="description" content="A CamScripter microapp that automatically points an Axis IP camera at the strongest nearby storm — by PTZ preset, CamSwitcher view, or continuous pan/tilt/zoom." />
+<style>
+  :root{
+    --bg:#0c1118; --panel:#151c26; --panel2:#1b2531; --text:#e7eef6; --muted:#9fb0c2;
+    --border:#28333f; --accent:#5b9bff; --accent2:#7db0ff; --storm:#ff6b61;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:radial-gradient(1200px 600px at 70% -10%, #1b2942 0%, var(--bg) 60%);
+    color:var(--text);font:16px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  a{color:var(--accent2);text-decoration:none}
+  a:hover{text-decoration:underline}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 22px}
+  header{padding:64px 0 40px;text-align:center}
+  .badge{width:72px;height:72px;border-radius:20px;display:inline-flex;align-items:center;justify-content:center;
+    font-size:38px;background:linear-gradient(135deg,var(--accent),#4f46e5);box-shadow:0 10px 30px rgba(37,99,235,.45);margin-bottom:18px}
+  h1{font-size:42px;line-height:1.1;margin:.2em 0 .1em;letter-spacing:-.02em}
+  .tag{color:var(--muted);font-size:19px;max-width:680px;margin:14px auto 0}
+  .cta{margin-top:30px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-block;padding:13px 22px;border-radius:11px;font-weight:700;border:1px solid var(--border)}
+  .btn.primary{background:linear-gradient(135deg,var(--accent),#4f46e5);color:#fff;border:0;box-shadow:0 6px 18px rgba(37,99,235,.4)}
+  .btn.ghost{background:var(--panel);color:var(--text)}
+  section{padding:34px 0}
+  h2{font-size:24px;margin:0 0 18px;letter-spacing:-.01em}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:16px}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px;
+    box-shadow:0 1px 2px rgba(0,0,0,.3),0 10px 26px rgba(0,0,0,.25)}
+  .card h3{margin:0 0 6px;font-size:17px}
+  .card p{margin:0;color:var(--muted);font-size:14.5px}
+  .modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+  .mode{background:var(--panel2);border:1px solid var(--border);border-left:4px solid var(--accent);
+    border-radius:12px;padding:18px}
+  .mode b{display:block;font-size:16px;margin-bottom:4px}
+  .mode span{color:var(--muted);font-size:14px}
+  ol{color:var(--muted)} ol b{color:var(--text)}
+  .pill{display:inline-block;font-size:12px;font-weight:700;color:var(--storm);
+    background:rgba(255,107,97,.14);border-radius:999px;padding:3px 10px;margin-bottom:14px}
+  footer{border-top:1px solid var(--border);margin-top:30px;padding:28px 0 60px;color:var(--muted);font-size:13.5px;text-align:center}
+  .src{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:8px}
+  .src a{background:var(--panel);border:1px solid var(--border);border-radius:999px;padding:5px 12px;font-size:13px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="badge">⛈</div>
+    <h1>Storm Chaser</h1>
+    <p class="tag">A CamScripter microapp that automatically points an Axis IP camera at the
+      strongest nearby storm — by PTZ preset, CamSwitcher view, or continuous pan/tilt/zoom.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/">View on GitHub</a>
+      <a class="btn ghost" href="Storm_Chaser_OperationsHD.pdf">Operations guide (PDF)</a>
+    </div>
+  </header>
+
+  <section>
+    <span class="pill">3 targeting modes</span>
+    <div class="modes">
+      <div class="mode"><b>PTZ presets</b><span>Assign up to 8 camera presets to compass directions; jump to the nearest one.</span></div>
+      <div class="mode"><b>CamSwitcher views</b><span>Switch between cameras / view areas per direction via CamSwitcher.</span></div>
+      <div class="mode"><b>PTZ tracking</b><span>Continuous absolute pan/tilt/zoom; zoom scales with storm distance.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>What it does</h2>
+    <div class="grid">
+      <div class="card"><h3>🌩 Storm scoring</h3><p>Ranks cells from free Open-Meteo data — lightning potential, CAPE, precipitation and wind gusts, with adjustable weights.</p></div>
+      <div class="card"><h3>🛰 Always-on data</h3><p>Falls back to keyless MET Norway when Open-Meteo's daily quota is hit, so tracking never stops.</p></div>
+      <div class="card"><h3>🌪 NWS alerts (US)</h3><p>Optionally follows live tornado / severe thunderstorm / hurricane warnings from the National Weather Service.</p></div>
+      <div class="card"><h3>🗺 Live map</h3><p>Camera, scan radius, colored sectors, RainViewer radar, and red storm dots. Click a dot to lock on manually.</p></div>
+      <div class="card"><h3>🖥 CamOverlay output</h3><p>Burn live status to an InfoTicker line and/or Custom Graphics fields.</p></div>
+      <div class="card"><h3>⚙️ Tuneable</h3><p>Metric/Imperial, 360°/180° coverage, dwell & hysteresis anti-jitter, export/import, light & dark UI.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Get started</h2>
+    <ol>
+      <li>Install <b>CamScripter</b> on your Axis camera (ARTPEC-6 or newer).</li>
+      <li>Upload <b>storm_chaser_x.y.z.zip</b> via <b>CamScripter → Add package</b>.</li>
+      <li>Open the settings UI, set camera, location and a targeting mode, then <b>Save &amp; restart</b>.</li>
+    </ol>
+    <p>Need detail? Read the bundled <b>UserGuide.md</b> or the illustrated
+      <a href="Storm_Chaser_OperationsHD.pdf">Operations guide</a>.</p>
+  </section>
+
+  <footer>
+    <div>Community project built on CamStreamer / CamScripter and Axis VAPIX APIs. Not affiliated with Axis or CamStreamer.</div>
+    <div class="src">
+      <a href="https://open-meteo.com">Open-Meteo</a>
+      <a href="https://api.met.no">MET Norway</a>
+      <a href="https://www.weather.gov/documentation/services-web-api">US NWS</a>
+      <a href="https://www.rainviewer.com/">RainViewer</a>
+      <a href="https://www.openstreetmap.org/">OpenStreetMap</a>
+    </div>
+  </footer>
+</div>
+</body>
+</html>
