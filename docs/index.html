@@ -65,13 +65,15 @@
   .card h3{margin:0 0 6px;font-size:17px}
   .card p{margin:0;color:var(--muted);font-size:14.5px}
   .modes{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
-  /* Mode screenshots — three in a row, hover to open a lightbox. */
+  /* Mode screenshots — three in a row; click the (+) to zoom. */
   .gallery{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
   @media(max-width:760px){.gallery{grid-template-columns:1fr}}
-  .shot{margin:0;background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
-  .shot .thumb{display:block;width:100%;height:172px;object-fit:cover;object-position:top center;cursor:zoom-in;
-    background:var(--panel2);transition:.15s}
-  .shot:hover .thumb{filter:brightness(.92)}
+  .shot{position:relative;margin:0;background:var(--panel);border:1px solid var(--border);border-radius:14px;overflow:hidden;box-shadow:var(--shadow)}
+  .shot .thumb{display:block;width:100%;height:172px;object-fit:cover;object-position:top center;background:var(--panel2)}
+  .zoombtn{position:absolute;top:10px;right:10px;width:34px;height:34px;border-radius:50%;border:0;cursor:pointer;
+    background:rgba(8,12,18,.6);color:#fff;font-size:20px;font-weight:700;line-height:1;display:grid;place-items:center;
+    backdrop-filter:blur(3px);transition:.15s}
+  .zoombtn:hover{background:var(--accent);transform:scale(1.08)}
   .shot .cap{padding:13px 15px}
   .shot .cap b{display:block;font-size:16px;margin-bottom:3px}
   .shot .cap span{color:var(--muted);font-size:14px}
@@ -144,18 +146,21 @@
 
   <section id="modes">
     <h2>Three ways to track</h2>
-    <p class="lead">Pick the mode that fits your hardware — switch any time. Hover a screenshot to enlarge.</p>
+    <p class="lead">Pick the mode that fits your hardware — switch any time. Click <b>+</b> on a screenshot to enlarge.</p>
     <div class="gallery">
       <figure class="shot">
         <img class="thumb" src="screenshot-presets.png" alt="PTZ presets settings screen" loading="lazy">
+        <button class="zoombtn" type="button" aria-label="Zoom screenshot">+</button>
         <figcaption class="cap"><b>PTZ presets</b><span>Assign up to 8 of the camera's presets to compass directions; jump to the nearest.</span></figcaption>
       </figure>
       <figure class="shot">
         <img class="thumb" src="screenshot-camswitcher.png" alt="CamSwitcher views settings screen" loading="lazy">
+        <button class="zoombtn" type="button" aria-label="Zoom screenshot">+</button>
         <figcaption class="cap"><b>CamSwitcher views</b><span>Switch between cameras / view areas per direction via CamSwitcher.</span></figcaption>
       </figure>
       <figure class="shot">
         <img class="thumb" src="screenshot-ptztrack.png" alt="PTZ tracking settings screen" loading="lazy">
+        <button class="zoombtn" type="button" aria-label="Zoom screenshot">+</button>
         <figcaption class="cap"><b>PTZ tracking</b><span>Continuous absolute pan / tilt / zoom — zoom scales with storm distance.</span></figcaption>
       </figure>
     </div>
@@ -201,17 +206,16 @@
 <div id="lightbox" aria-hidden="true"><button class="x" type="button" aria-label="Close">×</button><img alt="" /></div>
 
 <script>
-  // Lightbox: open a screenshot on hover/click; close on X, click, leave or Esc.
+  // Lightbox: open via the (+) button; close on X, backdrop/image click, or Esc.
   (function () {
     var lb = document.getElementById('lightbox'), img = lb.querySelector('img');
     function open(src, alt) { img.src = src; img.alt = alt || ''; lb.classList.add('open'); }
     function close() { lb.classList.remove('open'); img.removeAttribute('src'); }
-    document.querySelectorAll('.shot .thumb').forEach(function (t) {
-      t.addEventListener('mouseenter', function () { open(t.src, t.alt); });
-      t.addEventListener('click', function () { open(t.src, t.alt); });
+    document.querySelectorAll('.shot').forEach(function (fig) {
+      var btn = fig.querySelector('.zoombtn'), t = fig.querySelector('.thumb');
+      if (btn && t) btn.addEventListener('click', function () { open(t.src, t.alt); });
     });
     lb.addEventListener('click', close);                 // click backdrop or image
-    img.addEventListener('mouseleave', close);           // move out of the image
     lb.querySelector('.x').addEventListener('click', function (e) { e.stopPropagation(); close(); });
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
   })();
