@@ -1,6 +1,6 @@
 # Storm Chaser — User Guide
 
-**Version 3.0.0** · CamScripter microapp for Axis IP cameras
+**Version 3.0.1** · CamScripter microapp for Axis IP cameras
 
 Storm Chaser automatically points an Axis camera at the strongest nearby storm. Every
 few minutes it scans the weather around the camera, finds the most active storm cell,
@@ -19,7 +19,7 @@ works out its compass direction and distance, and aims the camera there — by c
 ## 2. Installation
 
 1. In the camera web UI open **Apps → CamScripter → Open**.
-2. Add a new package and upload `storm_chaser_3_0_0.zip`.
+2. Add a new package and upload `storm_chaser_3_0_1.zip`.
 3. Open the Storm Chaser settings UI from the package, configure it (below), and click **Save & restart**.
 
 > Settings are stored on the camera and survive restarts/upgrades. The settings page also

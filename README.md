@@ -1,4 +1,4 @@
-# ⛈ Storm Chaser for Axis IP cameras - Powered by CamScripter ⛈
+# ⛈ Storm Chaser
 
 **Automatically point an Axis IP camera at the strongest nearby storm.**
 
@@ -13,8 +13,6 @@ warnings.
 > official Axis or CamStreamer product.
 
 ---
-
-<img width="100%" alt="Storm-Chaser-—-Settings-06-06-2026_03_52_PM" src="https://github.com/user-attachments/assets/67244c0d-0caf-4a54-beef-c17df173d5c6" />
 
 ## Features
 
@@ -35,7 +33,7 @@ warnings.
 ## Quick start
 
 1. Install the **CamScripter** ACAP on your Axis camera (ARTPEC-6 or newer).
-2. Download the latest [`storm_chaser_x.y.z.zip`](releases) and upload it via
+2. Download the latest [`storm_chaser_3_0_1.zip`](releases) and upload it via
    **CamScripter → Add package**.
 3. Open the settings UI, set the camera connection, location, a targeting mode, then
    **Save & restart**.
@@ -57,15 +55,20 @@ The package ships files at the archive root (`main.js`, `manifest.json`, `html/`
 ## Repository layout
 
 ```
+index.html               GitHub Pages site (served from repo root)
+docs/                    web assets / graphics for the page
+  Storm_Chaser_OperationsHD.pdf
 storm_chaser/            CamScripter package (the app)
   main.js                backend logic
   html/                  settings UI (index.html, index.js)
   localdata/settings.json default settings
   UserGuide.md           in-package user guide
-docs/                    GitHub Pages site
-Storm_Chaser_OperationsHD.pdf   illustrated operations guide
-README.md
+storm_chaser_3_0_1.zip   installable build
+README.md · LICENSE · .gitignore
 ```
+
+> **GitHub Pages:** serve from the repository **root** — `index.html` is the page and all
+> its graphics/assets live in `docs/`.
 
 ## Data sources
 

@@ -1,6 +1,6 @@
 {
   "name": "storm-chaser",
-  "version": "3.0.0",
+  "version": "3.0.1",
   "description": "Points an Axis PTZ camera at the strongest nearby storm cell / lightning activity by calling preset positions, using free Open-Meteo data.",
   "main": "main.js",
   "scripts": {
