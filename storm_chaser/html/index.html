@@ -38,6 +38,8 @@
     box-shadow: 0 2px 6px rgba(37,99,235,.4); }
   header h1 { font-size: 16px; font-weight: 700; margin: 0; flex: 1; letter-spacing: -.01em; }
   header .sub { color: var(--muted); font-size: 12px; font-weight: 500; }
+  header .ver { font-size: 12px; font-weight: 700; color: var(--muted); padding: 2px 8px; border-radius: 999px;
+    background: color-mix(in srgb, var(--muted) 16%, transparent); vertical-align: middle; }
 
   .wrap { max-width: 100%; margin: 0; padding: 18px 22px 84px; }
   /* Settings on the left as a tight masonry; map + log pinned on the right.
@@ -160,8 +162,9 @@
 <body>
 <header>
   <span class="brand-badge">⛈</span>
-  <h1>Storm Chaser <span class="sub">— CamSwitcher &amp; Axis Cam PTZ preset auto-aim</span></h1>
+  <h1>Storm Chaser <span id="verBadge" class="ver">v…</span> <span class="sub">— CamSwitcher &amp; Axis Cam PTZ preset auto-aim</span></h1>
   <span id="runPill" class="pill off">…</span>
+  <a class="switch" href="https://github.com/PaoloCortezCZ/Storm-Chaser-for-Axis-Camera" target="_blank" rel="noopener" title="Get it on GitHub" style="text-decoration:none">↗ GitHub</a>
   <a href="https://ko-fi.com/B3S720JCU6" target="_blank" rel="noopener" title="Buy me a coffee on Ko-fi" style="display:inline-flex;align-items:center">
     <img height="34" style="border:0;height:34px;display:block" src="https://storage.ko-fi.com/cdn/kofi6.png?v=6" alt="Buy Me a Coffee at ko-fi.com" /></a>
   <button id="themeToggle" class="switch" type="button">🌙 Dark</button>
@@ -175,10 +178,21 @@
       <h2>Camera connection <button class="infobtn" type="button" aria-label="info">i</button></h2>
       <div class="cardinfo">
         <p>How Storm Chaser reaches your camera. <b>Local</b>: enter the camera IP, user and password (modern Axis cameras use digest auth, handled automatically). <b>Cloud</b>: tick "Use CamStreamer Cloud" and paste the device-connect.net URL + access token instead — useful when the camera isn't on your LAN.</p>
+        <p><b>Protocol &amp; port</b>: choose HTTP or HTTPS. Leave the port blank/0 to use the protocol default (80 for HTTP, 443 for HTTPS), or set a custom port if your camera listens elsewhere. HTTPS accepts self-signed / untrusted certificates, which is the usual case for Axis cameras on a LAN.</p>
         <p><b>PTZ camera channel</b> selects which video channel / view area the PTZ preset commands target (1 for most cameras).</p>
       </div>
       <div class="check"><input type="checkbox" id="enabled"><label for="enabled" style="margin:0">App enabled</label></div>
       <label>Camera IP</label><input id="camera_ip" />
+      <div class="row3">
+        <div><label>Protocol</label>
+          <select id="camera_protocol">
+            <option value="http">HTTP</option>
+            <option value="https">HTTPS</option>
+          </select>
+        </div>
+        <div><label>Port</label><input id="camera_port" type="number" min="0" max="65535" placeholder="auto" /></div>
+        <div style="display:flex;align-items:flex-end"><span id="portHint" class="hint" style="margin:0 0 8px"></span></div>
+      </div>
       <div class="row">
         <div><label>User</label><input id="camera_user" /></div>
         <div><label>Password</label><input id="camera_pass" type="password" /></div>
@@ -241,6 +255,10 @@
           <div><label>Camera faces this bearing at pan 0 (°)</label><input id="ptz_ref_bearing" type="number" min="0" max="359" /></div>
           <div><label>Fixed tilt (°, 0 = horizon)</label><input id="ptz_tilt" type="number" step="1" /></div>
         </div>
+        <div class="row">
+          <div><label>Pan left reach (°, counter-clockwise)</label><input id="ptz_arc_left_deg" type="number" min="0" max="180" /></div>
+          <div><label>Pan right reach (°, clockwise)</label><input id="ptz_arc_right_deg" type="number" min="0" max="180" /></div>
+        </div>
         <div class="row3">
           <div><label>Zoom near (%)</label><input id="ptz_zoom_min_pct" type="number" min="0" max="100" /></div>
           <div><label>Zoom far (%)</label><input id="ptz_zoom_max_pct" type="number" min="0" max="100" /></div>
@@ -248,7 +266,7 @@
         </div>
         <button class="btn sm ghost" id="readPtzBtn" type="button" style="margin-top:8px">⊕ Read current camera position</button>
         <span id="ptzPosMsg" class="hint" style="margin-left:8px"></span>
-        <p class="hint">The camera moves to <code>pan = storm bearing − reference</code>, holds your fixed tilt, and zooms between "near" and "far" based on distance (near storms = wide, far = tele). Uses the PTZ channel set under Camera connection. Tick "Flip pan" if it turns the wrong way.</p>
+        <p class="hint">The camera moves to <code>pan = storm bearing − reference</code>, holds your fixed tilt, and zooms between "near" and "far" based on distance (near storms = wide, far = tele). Uses the PTZ channel set under Camera connection. Tick "Flip pan" if it turns the wrong way.<br><b>Pan reach</b> limits how far the camera swings from its pan-0 bearing: e.g. facing North with 90° left + 120° right covers W→ESE and ignores storms behind those edges. Set both to 180 for a full 360° camera. "Left" is counter-clockwise (West when facing North), "right" is clockwise (East). These geographic limits don't change with "Flip pan".</p>
       </div>
       <div id="viewareaModeBox" style="display:none;margin-top:8px">
         <div style="margin-bottom:8px">

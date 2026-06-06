@@ -1,6 +1,6 @@
 # Storm Chaser — User Guide
 
-**Version 3.0.2** · CamScripter microapp for Axis IP cameras
+**Version 3.0.3** · CamScripter microapp for Axis IP cameras
 
 Storm Chaser automatically points an Axis camera at the strongest nearby storm. Every
 few minutes it scans the weather around the camera, finds the most active storm cell,
@@ -25,12 +25,37 @@ works out its compass direction and distance, and aims the camera there — by c
 > Settings are stored on the camera and survive restarts/upgrades. The settings page also
 > keeps a local draft in your browser, so an accidental refresh won't lose un‑saved edits.
 
-## 3. How it works
+## 3. How it works — the anatomy of automated tracking
 
-Each scan the app samples weather at a fan of points around the camera (the **probe grid**),
-scores every point for storm strength, and picks the strongest as the target. It then moves
-the camera to face that direction. Anti‑jitter logic (dwell + hysteresis) keeps it from
-flipping back and forth, and a "switch margin" lets a clearly stronger storm jump the queue.
+Storm Chaser acts as an autonomous director in three stages:
+
+1. **Input — weather API.** Each scan it samples weather at a structured fan of points around
+   the camera (the **probe grid**): precipitation, wind gusts, CAPE and lightning potential.
+2. **Brain — Storm Chaser logic.** It computes an aggregate **threat score** for every point,
+   applies the camera‑behavior model and anti‑jitter rules, and decides the dominant target.
+3. **Output — Axis PTZ & overlays.** It issues camera‑control commands for optimized framing
+   and pipes live targeting data into CamOverlay broadcast graphics.
+
+Anti‑jitter logic (dwell + hysteresis) keeps it from flipping between cells, and a **switch
+margin** lets a clearly stronger storm jump the queue. Enabling **NWS severe‑weather
+warnings** lets a confirmed tornado / severe thunderstorm / hurricane override the score.
+
+### The threat matrix
+The aggregate score is a weighted blend, biased toward active electrical storms and heavy
+rain: **lightning potential ≈ 1.0**, **precipitation ≈ 0.15**, **wind gusts ≈ 0.02**,
+**CAPE ≈ 0.002** (CAPE numbers are large, hence the small weight). Tune these weights to suit
+your climate.
+
+### The targeting decision loop
+To avoid chaotic panning the app runs a disciplined cycle: **Scan interval** (how often radar
+data refreshes) → **Switch margin** (a new storm must score this much higher to win) →
+**Hysteresis** (angular jitter filter) → **Min dwell** (hold a stable shot before
+recalculating).
+
+### Reading the tactical map
+The map shows: **blue pin** = camera anchor · **concentric ring** = scan radius ·
+**colored wedges** = preset/view sectors · **red dot** = the dominant threat cell driving the
+current switch · **purple dots** = active NWS warnings.
 
 ## 4. Settings reference
 
@@ -131,6 +156,16 @@ Use **Export** to download all settings as JSON (backup or copy to another camer
   or rely on the MET Norway fallback.
 - **Camera points the wrong way** — verify the camera location, the preset/view bearings, and in
   PTZ‑tracking mode the reference bearing and the *Flip pan* option.
+
+## 9. Deployment readiness checklist
+
+Run these phases in order for stable autonomous tracking:
+
+1. **Lock the base** — verify the camera IP handshake and enter hyper‑accurate site latitude/longitude.
+2. **Cast the net** — set the scan radius and probe grid (rings × samples); keep an eye on the estimated daily API calls.
+3. **Tune the matrix** — set the threat weights and enable NWS severe‑weather overrides.
+4. **Dictate the strategy** — choose PTZ presets, PTZ tracking, or CamSwitcher for your deployment.
+5. **Verify the map** — confirm the blue anchor pin, colored geometry and red threat dots align with the physical horizon.
 
 ---
 

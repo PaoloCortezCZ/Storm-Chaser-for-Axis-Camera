@@ -55,24 +55,56 @@ function cleanErr(body) {
     return String(body).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 120);
 }
 
-/** CameraVapix client for the configured LOCAL camera (handles digest auth). */
+/** True when the configured local camera should be reached over HTTPS. */
+function cameraTls(conn) {
+    return String((conn || settings).camera_protocol || 'http').toLowerCase() === 'https';
+}
+
+/** Effective TCP port: explicit override, else the protocol default (80/443). */
+function cameraPort(conn) {
+    const p = Number((conn || settings).camera_port) || 0;
+    return p > 0 ? p : (cameraTls(conn) ? 443 : 80);
+}
+
+/**
+ * CameraVapix client for the configured LOCAL camera (handles digest auth).
+ * Honours the HTTP/HTTPS protocol and port settings. For HTTPS we set
+ * tlsInsecure so cameras with self-signed / untrusted certificates still work
+ * (the common case for Axis devices on a LAN).
+ */
 function localVapix(conn) {
-    return new CameraVapix({
-        ip: conn.camera_ip || '127.0.0.1',
-        port: 80,
-        user: conn.camera_user || 'root',
-        pass: conn.camera_pass || '',
-        tls: false,
-    });
+    const tls = cameraTls(conn);
+    const opts = {
+        ip: (conn || settings).camera_ip || '127.0.0.1',
+        port: cameraPort(conn),
+        user: (conn || settings).camera_user || 'root',
+        pass: (conn || settings).camera_pass || '',
+        tls,
+    };
+    if (tls) opts.tlsInsecure = true;   // accept untrusted/self-signed HTTPS certs
+    return new CameraVapix(opts);
 }
 
 const SETTINGS_PATH = path.join(process.env.PERSISTENT_DATA_PATH ?? '.', 'settings.json');
 const PKG = process.env.PACKAGE_NAME ?? 'storm_chaser';
 
+// Read our own version from the installed manifest so the UI can show it
+// reliably — the browser can't always fetch manifest.json through the cloud
+// (device-connect.net) proxy, but it can always reach status.cgi.
+const PACKAGE_VERSION = (() => {
+    for (const p of [path.join(process.env.INSTALL_PATH ?? '.', 'manifest.json'),
+                     path.join(__dirname, 'manifest.json'), 'manifest.json']) {
+        try { return JSON.parse(fs.readFileSync(p, 'utf8')).package_version || ''; } catch {}
+    }
+    return '';
+})();
+
 const DEFAULT_SETTINGS = {
     enabled: true,
 
     camera_ip: '127.0.0.1',
+    camera_protocol: 'http',    // 'http' or 'https' (https accepts untrusted certs)
+    camera_port: 0,             // 0 = use protocol default (80 for http, 443 for https)
     camera_user: 'root',
     camera_pass: '',
     use_cloud: false,
@@ -95,6 +127,12 @@ const DEFAULT_SETTINGS = {
     ptz_tilt: 0,                // fixed tilt in degrees (0 = horizon)
     ptz_zoom_min_pct: 0,        // zoom % for the nearest storms (wide)
     ptz_zoom_max_pct: 80,       // zoom % for the farthest storms (tele)
+    // Pan limits for PTZ tracking, measured from the reference bearing (pan 0).
+    // "Left" = counter-clockwise (e.g. West when facing North), "right" =
+    // clockwise (East when facing North). Storms outside [-left, +right] are
+    // ignored and the camera holds/returns home. 180 + 180 = full circle.
+    ptz_arc_left_deg: 90,
+    ptz_arc_right_deg: 90,
     // CamSwitcher: up to 5 views, each with a facing bearing + full URL (or just
     // playlist_name). cs_home_url is called when there is no storm.
     cs_view_count: 3,
@@ -253,7 +291,7 @@ function geomCentroid(geom) {
 async function fetchNwsAlerts(lat, lon) {
     const url = `https://api.weather.gov/alerts/active?point=${lat.toFixed(4)},${lon.toFixed(4)}&status=actual`;
     const resp = await fetch(url, {
-        headers: { 'User-Agent': 'StormChaser-CamScripter/1.1 (camstreamer)', Accept: 'application/geo+json' },
+        headers: { 'User-Agent': 'StormChaser-CamScripter/3.0.8 (camstreamer)', Accept: 'application/geo+json' },
         signal: AbortSignal.timeout(8000),
     });
     if (!resp.ok) throw new Error(`NWS HTTP ${resp.status}`);
@@ -516,7 +554,26 @@ function buildCgiRequest(apiPath, params = {}) {
         return { url: `${settings.cloud_url}${apiPath}?${qp}`, headers: {} };
     }
     const auth = 'Basic ' + Buffer.from(`${settings.camera_user}:${settings.camera_pass}`).toString('base64');
-    return { url: `http://${settings.camera_ip}${apiPath}?${qp}`, headers: { Authorization: auth } };
+    const scheme = cameraTls() ? 'https' : 'http';
+    const port = cameraPort();
+    const portPart = (scheme === 'https' && port === 443) || (scheme === 'http' && port === 80) ? '' : `:${port}`;
+    return { url: `${scheme}://${settings.camera_ip}${portPart}${apiPath}?${qp}`, headers: { Authorization: auth } };
+}
+
+/**
+ * Fire-and-forget CamOverlay CGI call. Local cameras go through CameraVapix so
+ * the HTTP/HTTPS protocol, port and self-signed-cert handling all apply; the
+ * cloud path keeps using the device-connect.net URL + access token.
+ */
+async function camOverlayGet(apiPath, params) {
+    try {
+        if (settings.use_cloud && settings.cloud_url) {
+            const { url, headers } = buildCgiRequest(apiPath, params);
+            await fetch(url, { headers, signal: AbortSignal.timeout(5000) });
+        } else {
+            await localVapix(settings).vapixGet(apiPath, params);
+        }
+    } catch { /* overlay updates are best-effort */ }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -659,17 +716,10 @@ async function queryCameraPresets(conn) {
 // CamOverlay InfoTicker (optional)
 // ─────────────────────────────────────────────────────────────────────────────
 async function pushInfoTicker(serviceId, text) {
-    const { url, headers } = buildCgiRequest('/local/camoverlay/api/infoticker.cgi', {
-        service_id: String(serviceId),
-        text,
-    });
-    await fetch(url, { headers, signal: AbortSignal.timeout(5000) }).catch(() => {});
+    await camOverlayGet('/local/camoverlay/api/infoticker.cgi', { service_id: String(serviceId), text });
 }
 async function setServiceVisible(serviceId, on) {
-    const { url, headers } = buildCgiRequest('/local/camoverlay/api/enabled.cgi', {
-        [`id_${serviceId}`]: on ? '1' : '0',
-    });
-    await fetch(url, { headers, signal: AbortSignal.timeout(5000) }).catch(() => {});
+    await camOverlayGet('/local/camoverlay/api/enabled.cgi', { [`id_${serviceId}`]: on ? '1' : '0' });
 }
 
 /** Available overlay variables formatted as display strings. */
@@ -699,9 +749,7 @@ function renderTicker(s) {
 
 /** Push one or more text fields to a CamOverlay Custom Graphics service. */
 async function pushCustomGraphics(serviceId, fields) {
-    const { url, headers } = buildCgiRequest('/local/camoverlay/api/customGraphics.cgi',
-        { service_id: String(serviceId), ...fields });
-    await fetch(url, { headers, signal: AbortSignal.timeout(5000) }).catch(() => {});
+    await camOverlayGet('/local/camoverlay/api/customGraphics.cgi', { service_id: String(serviceId), ...fields });
 }
 
 /**
@@ -772,11 +820,24 @@ function addLog(msg) {
 // ─────────────────────────────────────────────────────────────────────────────
 let updateTimer = null;
 
+// A cell only counts as a storm if there is genuine convective ACTIVITY:
+// measurable lightning potential or actual rainfall. CAPE and wind gusts are
+// instability/wind that are routinely high on perfectly clear days, so they may
+// only *amplify* an already-active cell — they can never, on their own, register
+// as a storm. Without this gate the score is dominated by ambient CAPE and the
+// camera can never reach the "no storm" state (every probe point clears the
+// trigger threshold). See intensity_threshold.
+const PRECIP_FLOOR_MM = 0.1;   // mm of rain in the current hour to count as activity
+const LIGHTNING_FLOOR = 0.1;   // J/kg lightning potential to count as activity
+
 function scoreIntensity(lightning, cape, precip, gust) {
+    const l = lightning || 0, p = precip || 0;
+    // Activity gate: no lightning and no meaningful rain → not a storm (score 0).
+    if (l < LIGHTNING_FLOOR && p < PRECIP_FLOOR_MM) return 0;
     return (
-        (Number(settings.w_lightning) || 0) * (lightning || 0) +
+        (Number(settings.w_lightning) || 0) * l +
         (Number(settings.w_cape) || 0) * (cape || 0) +
-        (Number(settings.w_precip) || 0) * (precip || 0) +
+        (Number(settings.w_precip) || 0) * p +
         (Number(settings.w_gust) || 0) * (gust || 0)
     );
 }
@@ -835,7 +896,7 @@ async function scoreMetNo(grid) {
     const cap = 14;
     const step = Math.max(1, Math.ceil(grid.length / cap));
     const pts = grid.filter((_, i) => i % step === 0).slice(0, cap);
-    const headers = { 'User-Agent': 'StormChaser-CamScripter/1.1 (camstreamer)' };
+    const headers = { 'User-Agent': 'StormChaser-CamScripter/3.0.8 (camstreamer)' };
     const results = await Promise.all(pts.map(async (pt) => {
         try {
             const url = `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${pt.lat.toFixed(4)}&lon=${pt.lon.toFixed(4)}`;
@@ -918,12 +979,15 @@ async function fetchAndUpdate() {
         }
 
         const best = lastTopSpots[0] || scored[0] || null;
-        // MET Norway scores are on a smaller scale (no CAPE/lightning), so the
-        // Open-Meteo-tuned threshold would always read "no storm". On the fallback
-        // we relax it and just follow the strongest active cell.
+        // The user's intensity_threshold is now honoured for BOTH providers. The
+        // activity gate in scoreIntensity already filters out clear-sky cells, so
+        // a quiet MET-Norway scan correctly reads "no storm" instead of being
+        // forced past a hardcoded relaxed value. Note: MET scores are on a smaller
+        // scale (precip + gust only, no CAPE/lightning), so a threshold tuned for
+        // Open-Meteo may rarely trip on the fallback — lower it if needed.
         const fallback = lastSource.startsWith('MET');
-        currentThreshold = fallback ? 0.05 : (Number(settings.intensity_threshold) || 0);
-        if (fallback) addLog(`(fallback: threshold relaxed — following strongest of ${scored.length} cells)`);
+        currentThreshold = Number(settings.intensity_threshold) || 0;
+        if (fallback) addLog(`(fallback: MET Norway — precip/gust only, your threshold ${currentThreshold} applies)`);
         fetchCount++;
         lastFetchTime = new Date().toLocaleString('en-GB', {
             day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
@@ -969,7 +1033,6 @@ function resolveTarget(best) {
 /** Continuous PTZ tracking: aim absolute pan/tilt/zoom at the storm. */
 async function decidePtzTrack(best, force, threshold, hyst, now) {
     const channel = Number(settings.ptz_channel) || 1;
-    const coverage = Number(settings.coverage_deg) === 180 ? 180 : 360;
 
     // No storm → return to the reference/home view (pan 0, fixed tilt, min zoom).
     if (!best || best.intensity < threshold) {
@@ -985,9 +1048,17 @@ async function decidePtzTrack(best, force, threshold, hyst, now) {
         return;
     }
 
-    // 180° arc limit (relative to the reference bearing).
-    if (coverage === 180 && angDiff(best.bearing, norm360(Number(settings.center_bearing_deg) || 0)) > 90) {
-        addLog(`Storm at ${Math.round(best.bearing)}° outside 180° arc — holding`);
+    // Asymmetric pan limit relative to the reference bearing. rel is the storm's
+    // signed offset from where the camera faces at pan 0: negative = left
+    // (counter-clockwise), positive = right (clockwise). Reach left/right are
+    // configurable, so e.g. 90° left + 120° right covers a 210° lopsided view.
+    const ref = norm360(Number(settings.ptz_ref_bearing) || 0);
+    const rel = ((best.bearing - ref + 540) % 360) - 180;   // -180..180, 0 = ref
+    const left = Math.max(0, Math.min(180, Number(settings.ptz_arc_left_deg) || 0));
+    const right = Math.max(0, Math.min(180, Number(settings.ptz_arc_right_deg) || 0));
+    if (rel < -left - 1e-6 || rel > right + 1e-6) {
+        const side = rel < 0 ? `${Math.round(-rel)}° left (limit ${left}°)` : `${Math.round(rel)}° right (limit ${right}°)`;
+        addLog(`Storm at ${Math.round(best.bearing)}° is ${side} — outside pan limits, holding`);
         lastStatus = { status: 'out of arc', bearing: best.bearing, distance: best.dist, intensity: best.intensity, preset: currentLabel || '—' };
         await updateOverlay(lastStatus);
         return;
@@ -1192,6 +1263,7 @@ function startHttpServer() {
         res.setHeader('Content-Type', 'application/json');
         res.end(JSON.stringify({
             running: true,
+            version: PACKAGE_VERSION,
             enabled: settings.enabled,
             lastFetch: lastFetchTime,
             nextFetch: nextFetchTime,
@@ -1330,7 +1402,7 @@ process.on('uncaughtException', (err) => {
 });
 
 async function main() {
-    console.log(`[${PKG}] ── Storm Chaser v3.0.2 starting ──`);
+    console.log(`[${PKG}] ── Storm Chaser v3.0.3 starting ──`);
     console.log(`[${PKG}] Settings: ${SETTINGS_PATH}`);
 
     process.on('SIGINT', () => {

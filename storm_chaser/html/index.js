@@ -8,16 +8,16 @@ const API = (ep) => `/local/camscripter/proxy/${PKG}/${ep}`;
 
 const FIELDS = {
   bool: ['enabled', 'use_cloud', 'overlay_enabled', 'nws_enabled', 'nws_override', 'ptz_pan_flip', 'cg_enabled'],
-  num: ['ptz_channel', 'latitude', 'longitude', 'coverage_deg', 'center_bearing_deg',
+  num: ['camera_port', 'ptz_channel', 'latitude', 'longitude', 'coverage_deg', 'center_bearing_deg',
         'home_preset', 'scan_radius_km', 'scan_rings', 'pp_count',
         'pp_preset_1', 'pp_preset_2', 'pp_preset_3', 'pp_preset_4', 'pp_preset_5', 'pp_preset_6', 'pp_preset_7', 'pp_preset_8',
         'pp_bearing_1', 'pp_bearing_2', 'pp_bearing_3', 'pp_bearing_4', 'pp_bearing_5', 'pp_bearing_6', 'pp_bearing_7', 'pp_bearing_8',
         'samples_per_ring', 'w_lightning', 'w_cape', 'w_precip', 'w_gust',
         'intensity_threshold', 'update_interval_min', 'dwell_min', 'hysteresis_deg',
         'switch_margin', 'top_spots', 'infoticker_service_id', 'cs_view_count',
-        'ptz_ref_bearing', 'ptz_tilt', 'ptz_zoom_min_pct', 'ptz_zoom_max_pct', 'cg_service_id',
+        'ptz_ref_bearing', 'ptz_tilt', 'ptz_zoom_min_pct', 'ptz_zoom_max_pct', 'ptz_arc_left_deg', 'ptz_arc_right_deg', 'cg_service_id',
         'cs_view_1_bearing', 'cs_view_2_bearing', 'cs_view_3_bearing', 'cs_view_4_bearing', 'cs_view_5_bearing'],
-  str: ['camera_ip', 'camera_user', 'camera_pass', 'cloud_url', 'device_access_token',
+  str: ['camera_ip', 'camera_protocol', 'camera_user', 'camera_pass', 'cloud_url', 'device_access_token',
         'location_name', 'infoticker_template', 'target_mode', 'unit_system', 'cs_home_url', 'cs_home_name',
         'cs_view_1_url', 'cs_view_2_url', 'cs_view_3_url', 'cs_view_4_url', 'cs_view_5_url',
         'cs_view_1_name', 'cs_view_2_name', 'cs_view_3_name', 'cs_view_4_name', 'cs_view_5_name',
@@ -122,8 +122,10 @@ const CS_COLORS = ['#2563eb', '#e8590c', '#16a34a', '#9333ea', '#0891b2', '#db27
       <span class="csswatch" style="background:${col}"></span>
       <div class="csbear"><label>Preset ${i} · °</label><input id="pp_bearing_${i}" type="number" min="0" max="359"></div>
       <div><label>Slot ${i} — camera preset</label>
-        <select class="pppick" id="pp_pick_${i}" data-target="pp_preset_${i}" data-name="pp_name_${i}" style="display:none"><option value="">— pick from camera —</option></select>
-        <input class="csurl" id="pp_preset_${i}" type="number" min="0" placeholder="preset #">
+        <div style="display:flex;gap:8px;align-items:center">
+          <select class="pppick" id="pp_pick_${i}" data-target="pp_preset_${i}" data-name="pp_name_${i}" style="flex:1;min-width:0"><option value="">— pick from camera —</option></select>
+          <input class="csurl" id="pp_preset_${i}" type="number" min="0" title="Preset number" placeholder="#" style="flex:0 0 64px;text-align:center">
+        </div>
         <input type="hidden" id="pp_name_${i}"></div>
     </div>`;
   }
@@ -188,6 +190,9 @@ function fill(s) {
   FIELDS.bool.forEach((k) => { if ($(k)) $(k).checked = !!s[k]; });
   FIELDS.num.forEach((k) => { if ($(k)) $(k).value = s[k] ?? ''; });
   FIELDS.str.forEach((k) => { if ($(k)) $(k).value = s[k] ?? ''; });
+  // Port 0 means "auto" — leave the box blank so the placeholder shows.
+  if ($('camera_port') && (!s.camera_port || Number(s.camera_port) === 0)) $('camera_port').value = '';
+  if ($('camera_protocol') && !s.camera_protocol) $('camera_protocol').value = 'http';
   // Show scan radius (stored in km) in the chosen display unit.
   displayUnit = s.unit_system === 'metric' ? 'metric' : 'imperial';
   if ($('unit_system')) $('unit_system').value = displayUnit;
@@ -195,6 +200,7 @@ function fill(s) {
   updateUnitLabels();
   syncModeSeg();
   syncLocationPicker();
+  syncPortHint();
   refreshDerived();
 }
 // Accept both "." and "," decimal separators (CZ/EU locale types comma).
@@ -378,6 +384,19 @@ function sectorViews() {
 
 function isPtzTrackMode() { return $('target_mode').value === 'ptztrack'; }
 
+// Camera protocol/port helper text: show the effective port and cert note.
+function syncPortHint() {
+  const https = ($('camera_protocol').value || 'http') === 'https';
+  const p = num($('camera_port').value) || 0;
+  const eff = p > 0 ? p : (https ? 443 : 80);
+  const el = $('portHint');
+  if (el) el.textContent = `→ port ${eff}` + (https ? ' · untrusted certs OK' : '');
+}
+['camera_protocol', 'camera_port'].forEach((k) => {
+  const el = $(k);
+  if (el) el.addEventListener('input', () => { syncPortHint(); saveDraft && saveDraft(); });
+});
+
 // Segmented control for targeting mode (replaces the dropdown).
 function syncModeSeg() {
   const v = $('target_mode').value || 'camswitcher';
@@ -416,9 +435,11 @@ function refreshDerived() {
   const coverage = Number($('coverage_deg').value) === 180 ? 180 : 360;
   $('centerLabel').textContent = coverage === 360 ? 'North offset (°)' : 'Arc center bearing (°)';
   if (ptz) {
-    $('coverageHint').textContent = coverage === 360
-      ? 'PTZ tracking: the camera pans continuously to the storm bearing and zooms by distance.'
-      : 'PTZ tracking limited to the 180° arc (center ± 90°). Storms outside it are ignored.';
+    const L = Math.max(0, Math.min(180, num($('ptz_arc_left_deg').value)));
+    const R = Math.max(0, Math.min(180, num($('ptz_arc_right_deg').value)));
+    $('coverageHint').textContent = (L + R >= 360)
+      ? 'PTZ tracking: full 360° — the camera pans to any storm bearing and zooms by distance.'
+      : `PTZ tracking: pans up to ${L}° left and ${R}° right of its pan-0 bearing (set under PTZ tracking). Storms outside this reach are ignored. The "Preset coverage" arc settings below are not used in this mode.`;
   } else if (va) {
     $('coverageHint').textContent = coverage === 360
       ? 'Each view is placed at its own bearing; the storm picks the nearest view.'
@@ -489,7 +510,7 @@ function drawCompass(centers, base) {
 }
 
 ['coverage_deg','center_bearing_deg','scan_rings','samples_per_ring',
- 'target_mode','cs_view_count','cs_home_url','update_interval_min','ptz_ref_bearing','pp_count']
+ 'target_mode','cs_view_count','cs_home_url','update_interval_min','ptz_ref_bearing','ptz_arc_left_deg','ptz_arc_right_deg','pp_count']
   .forEach((k) => $(k).addEventListener('input', refreshDerived));
 // PTZ-preset rows → refresh on edit, and capture preset nice name on pick.
 $('ppRows').addEventListener('input', () => { refreshDerived(); saveDraft(); });
@@ -503,7 +524,7 @@ $('fetchPresetsBtn2').addEventListener('click', fetchPresets);
 
 // PTZ tracking: read the camera's current pan/tilt/zoom and show it.
 $('readPtzBtn').addEventListener('click', async () => {
-  const c = connSettingsFull(); c.ptz_channel = num($('ptz_channel').value) || 1;
+  const c = connSettings(); c.ptz_channel = num($('ptz_channel').value) || 1;
   $('ptzPosMsg').textContent = 'Reading…';
   try {
     const r = await fetch(API('ptzpos.cgi'), { method: 'POST', body: JSON.stringify(c) });
@@ -611,11 +632,25 @@ function updateMap() {
   mapLayers.push(L.marker([lat, lon]).addTo(map).bindPopup(
     `📷 ${$('location_name').value || 'Camera'}<br>${lat.toFixed(4)}, ${lon.toFixed(4)}`));
 
-  // PTZ-track mode: show the camera's reference (pan 0) direction.
+  // PTZ-track mode: show the camera's reference (pan 0) direction plus the
+  // configurable left/right pan reach as a shaded coverage wedge.
   if (isPtzTrackMode()) {
     const ref = norm360(num($('ptz_ref_bearing').value));
+    const left = Math.max(0, Math.min(180, num($('ptz_arc_left_deg').value)));
+    const right = Math.max(0, Math.min(180, num($('ptz_arc_right_deg').value)));
+    const span = left + right;
+    if (span > 0 && span < 360) {
+      const pts = [[lat, lon]];
+      const STEPS = 36;
+      for (let s = 0; s <= STEPS; s++) pts.push(destPoint(lat, lon, (ref - left) + (s / STEPS) * span, radiusKm));
+      mapLayers.push(L.polygon(pts, { color: accent, weight: 1.5, opacity: 0.85, fillColor: accent, fillOpacity: 0.12 })
+        .addTo(map).bindTooltip(`PTZ pan reach · ${left}° left + ${right}° right`));
+    } else if (span >= 360) {
+      mapLayers.push(L.circle([lat, lon], { radius: radiusKm * 1000, color: accent, weight: 1.5, fillColor: accent, fillOpacity: 0.10 })
+        .addTo(map).bindTooltip('PTZ pan reach · full 360°'));
+    }
     const end = destPoint(lat, lon, ref, radiusKm);
-    mapLayers.push(L.polyline([[lat, lon], end], { color: accent, weight: 2, dashArray: '6 5', opacity: 0.8 }).addTo(map).bindTooltip(`Camera home (pan 0) · ${Math.round(ref)}° ${compass(ref)}`));
+    mapLayers.push(L.polyline([[lat, lon], end], { color: accent, weight: 2, dashArray: '6 5', opacity: 0.9 }).addTo(map).bindTooltip(`Camera home (pan 0) · ${Math.round(ref)}° ${compass(ref)}`));
   }
 
   // Coverage wedges, centered on each sector's (possibly explicit) bearing.
@@ -750,20 +785,25 @@ $('viewarea_select').addEventListener('change', () => {
   applyViewArea(lastViewAreas[Number($('viewarea_select').value)]);
 });
 
+// Mirror the fetch-presets status to both buttons (connection card + coverage card).
+function presetMsg(t) {
+  $('presetFetchMsg').textContent = t;
+  if ($('ppFetchMsg')) $('ppFetchMsg').textContent = t;
+}
 async function fetchPresets() {
   const c = connSettings();
-  if (!c.use_cloud && !c.camera_ip) { $('presetFetchMsg').textContent = 'Enter camera IP first.'; return; }
-  $('presetFetchMsg').textContent = 'Querying camera…';
+  if (!c.use_cloud && !c.camera_ip) { presetMsg('Enter camera IP first.'); return; }
+  presetMsg('Querying camera…');
   $('fetchPresetsBtn').disabled = true;
   try {
     const r = await fetch(API('presets.cgi'), { method: 'POST', body: JSON.stringify(c) });
     const j = await r.json();
-    if (!j.ok) { $('presetFetchMsg').textContent = '✗ ' + (j.error || 'failed'); return; }
+    if (!j.ok) { presetMsg('✗ ' + (j.error || 'failed')); return; }
     const total = (j.viewAreas || []).reduce((n, v) => n + v.presets.length, 0);
     renderViewAreas(j.viewAreas);
-    $('presetFetchMsg').textContent = `✓ ${j.viewAreas.length} view area(s), ${total} preset(s)`;
+    presetMsg(`✓ ${j.viewAreas.length} view area(s), ${total} preset(s)`);
   } catch (e) {
-    $('presetFetchMsg').textContent = '✗ ' + e;
+    presetMsg('✗ ' + e);
   } finally {
     $('fetchPresetsBtn').disabled = false;
   }
@@ -789,6 +829,8 @@ async function poll() {
     const s = await (await fetch(API('status.cgi'))).json();
     $('runPill').textContent = s.enabled ? 'RUNNING' : 'DISABLED';
     $('runPill').className = 'pill ' + (s.enabled ? 'on' : 'off');
+    const vb = document.getElementById('verBadge');
+    if (vb && s.version) vb.textContent = 'v' + s.version;
     const cs = s.currentStatus || {};
     $('st_status').textContent = cs.status ?? '—';
     $('st_preset').textContent = cs.preset ?? s.currentPreset ?? '—';
@@ -856,12 +898,6 @@ function importSettings(file) {
 
 // ── Fetch CamSwitcher playlists from the camera ──────────────────────────────
 let csPlaylists = [];
-function connSettingsFull() {
-  return {
-    camera_ip: $('camera_ip').value, camera_user: $('camera_user').value, camera_pass: $('camera_pass').value,
-    use_cloud: $('use_cloud').checked, cloud_url: $('cloud_url').value, device_access_token: $('device_access_token').value,
-  };
-}
 function populatePlaylistPickers() {
   const icon = (t) => t === 'camera' ? '📷' : (t === 'playlist' ? '🎬' : '•');
   const esc = (s) => String(s).replace(/"/g, '&quot;');
@@ -872,7 +908,7 @@ function populatePlaylistPickers() {
   });
 }
 async function fetchPlaylists() {
-  const c = connSettingsFull();
+  const c = connSettings();
   if (!c.use_cloud && !c.camera_ip) { $('csFetchMsg').textContent = 'Enter camera IP first.'; return; }
   $('csFetchMsg').textContent = 'Querying CamSwitcher…';
   $('fetchPlaylistsBtn').disabled = true;
@@ -933,3 +969,15 @@ $('logBtn').addEventListener('click', poll);
 
 initMap();
 load().then(() => { if (mapReady) setTimeout(() => { map.invalidateSize(); updateMap(); }, 200); poll(); setInterval(poll, 5000); });
+
+// Installed version is shown from status.cgi in poll() (works through the cloud
+// proxy). Try the static manifest.json too as an early/local fast-path, but
+// never blank the badge on failure — leave whatever poll() set.
+(function showVersion() {
+  const badge = document.getElementById('verBadge');
+  if (!badge) return;
+  fetch(`/local/camscripter/package/${PKG}/manifest.json`)
+    .then((r) => (r.ok ? r.json() : Promise.reject()))
+    .then((m) => { if (m.package_version) badge.textContent = 'v' + m.package_version; })
+    .catch(() => {});
+})();
