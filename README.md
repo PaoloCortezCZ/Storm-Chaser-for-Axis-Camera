@@ -1,6 +1,8 @@
-# ⛈ Storm Chaser
+# ⛈ Storm Chaser for Axis IP Cameras via CamScripter ⛈
 
 **Automatically point an Axis IP camera at the strongest nearby storm.**
+
+
 
 Storm Chaser is a [CamScripter](https://camstreamer.com/camscripter) microapp for Axis
 cameras. Every few minutes it scans the weather around the camera, finds the most active
@@ -12,6 +14,9 @@ warnings.
 > ⚠️ Community project built on the CamStreamer / CamScripter and Axis VAPIX APIs. Not an
 > official Axis or CamStreamer product.
 
+<div align="center"> 
+  <img width="50%" alt="Axis IP Camera Storm Chaser" src="https://github.com/user-attachments/assets/4865c696-a62f-4f84-acfd-519196f97a12" />
+</div>
 ---
 
 ## Features
@@ -29,6 +34,9 @@ warnings.
 - **CamOverlay output** — InfoTicker line and/or Custom Graphics fields.
 - **Metric / Imperial** units, **360° / 180°** coverage, anti-jitter dwell & hysteresis,
   light/dark UI, settings **export / import**.
+<div align="center"> 
+  <img width="100%" height="407" alt="3waystotrackstorms" src="https://github.com/user-attachments/assets/931cac1f-60da-4e82-91d5-051fe57e7ec9" />
+</div>
 
 ## Quick start
 
