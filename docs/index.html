@@ -116,7 +116,7 @@
 <div class="wrap">
   <header>
     <div class="badge">⛈</div>
-    <h1>Point your camera at the storm — automatically.</h1>
+    <h1>Point your Axis IP camera at the storm — automatically.</h1>
     <p class="tag">Storm Chaser is a CamScripter microapp for Axis IP cameras. It scans the weather
       around the camera, finds the strongest cell, and aims at it via PTZ preset, CamSwitcher view,
       or continuous pan / tilt / zoom.</p>
@@ -131,6 +131,16 @@
       <span class="chip">Free weather data</span>
     </div>
   </header>
+
+  <section id="how">
+    <h2>The anatomy of automated tracking</h2>
+    <p class="lead">Storm Chaser acts as an autonomous director — pulling weather telemetry, scoring atmospheric threats, and driving the camera to frame the most critical cell.</p>
+    <div class="modes">
+      <div class="mode"><b>① Input — weather API</b><span>Continuously samples raw telemetry: atmospheric conditions and weather-cell identification across a probe grid around the camera.</span></div>
+      <div class="mode"><b>② Brain — Storm Chaser logic</b><span>Scores threat levels, applies the camera-behavior model and anti-jitter rules, and decides where to look — autonomously.</span></div>
+      <div class="mode"><b>③ Output — Axis PTZ &amp; overlays</b><span>Issues camera-control commands for optimized framing, and pipes live targeting data into broadcast graphics.</span></div>
+    </div>
+  </section>
 
   <section id="video">
     <h2>See it in action</h2>
@@ -153,17 +163,17 @@
       <figure class="shot">
         <img class="thumb" src="screenshot-presets.png" alt="PTZ presets settings screen" loading="lazy">
         <button class="zoombtn" type="button" aria-label="Zoom screenshot">+</button>
-        <figcaption class="cap"><b>PTZ presets</b><span>Assign up to 8 of the camera's presets to compass directions; jump to the nearest.</span></figcaption>
+        <figcaption class="cap"><b>PTZ presets</b><span>Jumps to pre-defined sector slices. Best for fixed sites where only certain viewing corridors are clear.</span></figcaption>
       </figure>
       <figure class="shot">
         <img class="thumb" src="screenshot-camswitcher.png" alt="CamSwitcher views settings screen" loading="lazy">
         <button class="zoombtn" type="button" aria-label="Zoom screenshot">+</button>
-        <figcaption class="cap"><b>CamSwitcher views</b><span>Switch between cameras / view areas per direction via CamSwitcher.</span></figcaption>
+        <figcaption class="cap"><b>CamSwitcher views</b><span>Cuts the live feed between distinct cameras/playlists by bearing. Best for multi-camera broadcasts spanning headings.</span></figcaption>
       </figure>
       <figure class="shot">
         <img class="thumb" src="screenshot-ptztrack.png" alt="PTZ tracking settings screen" loading="lazy">
         <button class="zoombtn" type="button" aria-label="Zoom screenshot">+</button>
-        <figcaption class="cap"><b>PTZ tracking</b><span>Continuous absolute pan / tilt / zoom — zoom scales with storm distance.</span></figcaption>
+        <figcaption class="cap"><b>PTZ tracking</b><span>Fluid, continuous pan/tilt/zoom on exact coordinates. Best for unobstructed 360° roof mounts.</span></figcaption>
       </figure>
     </div>
   </section>
@@ -206,15 +216,18 @@
   </section>
 
   <section id="start">
-    <h2>Get started</h2>
-    <p class="lead">Three steps from zip to chasing storms.</p>
+    <h2>Deployment readiness checklist</h2>
+    <p class="lead">Five phases, in sequence, for stable autonomous tracking.</p>
     <ol class="steps">
-      <li>Install <b>CamScripter</b> on your Axis camera (ARTPEC-6 or newer).</li>
-      <li>Upload <b>storm_chaser_3_0_2.zip</b> via <b>CamScripter → Add package</b>.</li>
-      <li>Open the settings UI, set camera, location and a targeting mode, then <b>Save &amp; restart</b>.</li>
+      <li><b>Lock the base.</b> Verify the camera IP handshake and enter hyper-accurate site latitude/longitude — all bearings are computed from here.</li>
+      <li><b>Cast the net.</b> Set the scan radius and probe grid (rings × samples); watch the estimated daily API calls.</li>
+      <li><b>Tune the matrix.</b> Set the threat weights (lightning, CAPE, precipitation, gusts) and enable NWS severe-weather overrides.</li>
+      <li><b>Dictate the strategy.</b> Choose PTZ presets, PTZ tracking, or CamSwitcher based on your deployment constraints.</li>
+      <li><b>Verify the map.</b> Confirm the blue anchor pin, colored sectors and red threat dots line up with the physical horizon.</li>
     </ol>
-    <p style="color:var(--muted)">Full detail: the bundled <b>UserGuide.md</b> or the illustrated
-      <a href="Storm_Chaser_OperationsHD.pdf">Operations guide (PDF)</a>.</p>
+    <p style="color:var(--muted)">Install <b>CamScripter</b> on the camera (ARTPEC-6+), upload
+      <b>storm_chaser_3_0_2.zip</b>, then <b>Save &amp; restart</b>. Full detail: the bundled
+      <b>UserGuide.md</b> or the illustrated <a href="Storm_Chaser_OperationsHD.pdf">Operations guide (PDF)</a>.</p>
   </section>
 
   <footer>
