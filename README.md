@@ -14,6 +14,8 @@ warnings.
 
 ---
 
+<img width="100%" alt="Storm-Chaser-—-Settings-06-06-2026_03_52_PM" src="https://github.com/user-attachments/assets/67244c0d-0caf-4a54-beef-c17df173d5c6" />
+
 ## Features
 
 - **Three targeting modes**
