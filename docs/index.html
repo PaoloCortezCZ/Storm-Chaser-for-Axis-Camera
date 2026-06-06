@@ -170,14 +170,38 @@
 
   <section id="features">
     <h2>What it does</h2>
-    <p class="lead">Everything runs on the camera; the map &amp; tuning live in the settings UI.</p>
-    <div class="grid">
-      <div class="card"><h3>🌩 Storm scoring</h3><p>Ranks cells from free Open-Meteo data — lightning potential, CAPE, precipitation and wind gusts, with adjustable weights.</p></div>
-      <div class="card"><h3>🛰 Always-on data</h3><p>Falls back to keyless MET Norway when Open-Meteo's daily quota is hit, so tracking never stops.</p></div>
-      <div class="card"><h3>🌪 NWS alerts (US)</h3><p>Optionally follows live tornado / severe thunderstorm / hurricane warnings from the National Weather Service.</p></div>
-      <div class="card"><h3>🗺 Live map</h3><p>Camera, scan radius, colored sectors, RainViewer radar, and red storm dots. Click a dot to lock on manually.</p></div>
-      <div class="card"><h3>🖥 CamOverlay output</h3><p>Burn live status to an InfoTicker line and/or Custom Graphics fields.</p></div>
-      <div class="card"><h3>⚙️ Tuneable</h3><p>Metric / Imperial, 360° / 180° coverage, dwell &amp; hysteresis anti-jitter, export / import, light &amp; dark UI.</p></div>
+    <p class="lead">Everything runs on the camera; the map &amp; tuning live in the settings UI. Click <b>+</b> to enlarge.</p>
+    <div class="gallery feat">
+      <figure class="shot">
+        <img class="thumb" src="feature-1.png" alt="Storm scoring" loading="lazy">
+        <button class="zoombtn" type="button" aria-label="Zoom screenshot">+</button>
+        <figcaption class="cap"><b>🌩 Storm scoring</b><span>Ranks cells from free Open-Meteo data — lightning potential, CAPE, precipitation and wind gusts, with adjustable weights.</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <img class="thumb" src="feature-2.png" alt="Always-on data" loading="lazy">
+        <button class="zoombtn" type="button" aria-label="Zoom screenshot">+</button>
+        <figcaption class="cap"><b>🛰 Always-on data</b><span>Falls back to keyless MET Norway when Open-Meteo's daily quota is hit, so tracking never stops.</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <img class="thumb" src="feature-3.png" alt="NWS alerts (US)" loading="lazy">
+        <button class="zoombtn" type="button" aria-label="Zoom screenshot">+</button>
+        <figcaption class="cap"><b>🌪 NWS alerts (US)</b><span>Optionally follows live tornado / severe thunderstorm / hurricane warnings from the National Weather Service.</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <img class="thumb" src="feature-4.png" alt="Live map" loading="lazy">
+        <button class="zoombtn" type="button" aria-label="Zoom screenshot">+</button>
+        <figcaption class="cap"><b>🗺 Live map</b><span>Camera, scan radius, colored sectors, RainViewer radar, and red storm dots. Click a dot to lock on manually.</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <img class="thumb" src="feature-5.png" alt="CamOverlay output" loading="lazy">
+        <button class="zoombtn" type="button" aria-label="Zoom screenshot">+</button>
+        <figcaption class="cap"><b>🖥 CamOverlay output</b><span>Burn live status to an InfoTicker line and/or Custom Graphics fields.</span></figcaption>
+      </figure>
+      <figure class="shot">
+        <img class="thumb" src="feature-6.png" alt="Tuneable" loading="lazy">
+        <button class="zoombtn" type="button" aria-label="Zoom screenshot">+</button>
+        <figcaption class="cap"><b>⚙️ Tuneable</b><span>Metric / Imperial, 360° / 180° coverage, dwell &amp; hysteresis anti-jitter, export / import, light &amp; dark UI.</span></figcaption>
+      </figure>
     </div>
   </section>
 
@@ -186,7 +210,7 @@
     <p class="lead">Three steps from zip to chasing storms.</p>
     <ol class="steps">
       <li>Install <b>CamScripter</b> on your Axis camera (ARTPEC-6 or newer).</li>
-      <li>Upload <b>storm_chaser_3_0_1.zip</b> via <b>CamScripter → Add package</b>.</li>
+      <li>Upload <b>storm_chaser_3_0_2.zip</b> via <b>CamScripter → Add package</b>.</li>
       <li>Open the settings UI, set camera, location and a targeting mode, then <b>Save &amp; restart</b>.</li>
     </ol>
     <p style="color:var(--muted)">Full detail: the bundled <b>UserGuide.md</b> or the illustrated
@@ -216,6 +240,8 @@
     document.querySelectorAll('.shot').forEach(function (fig) {
       var btn = fig.querySelector('.zoombtn'), t = fig.querySelector('.thumb');
       if (btn && t) btn.addEventListener('click', function () { open(t.src, t.alt); });
+      // Hide a card whose screenshot is missing (avoids a broken-image icon).
+      if (t) t.addEventListener('error', function () { fig.style.display = 'none'; });
     });
     lb.addEventListener('click', close);                 // click backdrop or image
     lb.querySelector('.x').addEventListener('click', function (e) { e.stopPropagation(); close(); });
