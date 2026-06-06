@@ -33,7 +33,7 @@ warnings.
 ## Quick start
 
 1. Install the **CamScripter** ACAP on your Axis camera (ARTPEC-6 or newer).
-2. Download the latest [`storm_chaser_3_0_2.zip`](releases) and upload it via
+2. Download the latest [`storm_chaser_3_0_2.zip`](https://github.com/PaoloCortezCZ/Storm-Chaser-for-Axis-Camera/releases) and upload it via
    **CamScripter → Add package**.
 3. Open the settings UI, set the camera connection, location, a targeting mode, then
    **Save & restart**.
