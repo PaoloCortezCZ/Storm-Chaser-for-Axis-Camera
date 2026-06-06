@@ -1330,7 +1330,7 @@ process.on('uncaughtException', (err) => {
 });
 
 async function main() {
-    console.log(`[${PKG}] ── Storm Chaser v3.0.1 starting ──`);
+    console.log(`[${PKG}] ── Storm Chaser v3.0.2 starting ──`);
     console.log(`[${PKG}] Settings: ${SETTINGS_PATH}`);
 
     process.on('SIGINT', () => {
