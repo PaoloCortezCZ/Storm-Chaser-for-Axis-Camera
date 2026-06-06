@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 200" width="380" height="200" font-family="system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif">
+  <rect width="380" height="200" fill="#eef2f8"/>
+  <!-- main badge -->
+  <rect x="34" y="22" width="312" height="58" rx="14" fill="#2f5bff"/>
+  <text x="190" y="59" text-anchor="middle" fill="#ffffff" font-size="27" font-weight="800" letter-spacing="-0.5">100% Secure &amp; Safe</text>
+  <!-- chips row 1 -->
+  <g>
+    <rect x="44" y="104" width="158" height="34" rx="17" fill="#dbe4fb"/>
+    <text x="123" y="126" text-anchor="middle" fill="#2f5bff" font-size="14" font-weight="700">Axis · CamScripter</text>
+    <rect x="214" y="104" width="122" height="34" rx="17" fill="#dbe4fb"/>
+    <text x="275" y="126" text-anchor="middle" fill="#2f5bff" font-size="14" font-weight="700">No API key</text>
+  </g>
+  <!-- chips row 2 -->
+  <g>
+    <rect x="30" y="150" width="140" height="34" rx="17" fill="#dbe4fb"/>
+    <text x="100" y="172" text-anchor="middle" fill="#2f5bff" font-size="14" font-weight="700">US NWS alerts</text>
+    <rect x="182" y="150" width="168" height="34" rx="17" fill="#dbe4fb"/>
+    <text x="266" y="172" text-anchor="middle" fill="#2f5bff" font-size="14" font-weight="700">Free weather data</text>
+  </g>
+</svg>
