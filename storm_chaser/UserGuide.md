@@ -1,6 +1,6 @@
 # Storm Chaser — User Guide
 
-**Version 3.0.3** · CamScripter microapp for Axis IP cameras
+**Version 4.0.0** · CamScripter microapp for Axis IP cameras
 
 Storm Chaser automatically points an Axis camera at the strongest nearby storm. Every
 few minutes it scans the weather around the camera, finds the most active storm cell,
@@ -19,7 +19,7 @@ works out its compass direction and distance, and aims the camera there — by c
 ## 2. Installation
 
 1. In the camera web UI open **Apps → CamScripter → Open**.
-2. Add a new package and upload `storm_chaser_3_0_2.zip`.
+2. Add a new package and upload `storm_chaser_4_0_0.zip`.
 3. Open the Storm Chaser settings UI from the package, configure it (below), and click **Save & restart**.
 
 > Settings are stored on the camera and survive restarts/upgrades. The settings page also
@@ -63,9 +63,16 @@ Each settings card has an **(i)** icon with a built‑in explanation. Summary:
 
 ### Camera connection
 - **Local**: camera IP, user, password (digest auth handled automatically).
+- **Protocol & port**: HTTP or HTTPS; leave the port blank for the default (80 / 443) or set
+  a custom one. HTTPS accepts self‑signed / untrusted certificates (normal for Axis on a LAN).
 - **Cloud**: tick *Use CamStreamer Cloud* and paste the device‑connect.net URL + access token.
 - **PTZ camera channel**: which video channel/view area PTZ commands target (usually 1).
-- **Fetch view areas & presets**: reads the camera's view areas and preset names.
+- **Fetch view areas & presets**: reads the camera's view areas and preset names (remembered
+  across page reloads).
+
+> On Axis OS 12 the VAPIX **root** user has no default password — create an Administrator
+> account in the camera's *System → Accounts* and use those credentials here. Over plain
+> HTTP the camera enforces Digest auth; over HTTPS it also accepts Basic. Both are handled.
 
 ### Camera location
 The exact spot the camera is mounted — the origin for all storm bearings. Use **Quick select**
@@ -77,7 +84,10 @@ degrees clockwise from north (0 = N, 90 = E, 180 = S, 270 = W).
   the preset nearest the storm.
 - **CamSwitcher views** — switch between cameras/view areas configured in CamSwitcher; assign
   each a facing bearing (360°) or let them tile the arc (180°).
-- **PTZ tracking** — continuous absolute pan/tilt/zoom toward the storm.
+- **PTZ tracking** — continuous absolute pan/tilt/zoom toward the storm. Set the **bearing the
+  camera faces at pan 0**, then its **left/right pan reach** independently (e.g. 90° left +
+  120° right for a lopsided 210° view); storms outside that arc are ignored. Set both to 180
+  for a full 360° camera.
 
 **Coverage**: 360° (full circle) or 180° (one‑sided arc centered on the arc‑center bearing).
 **Home preset/view**: where it parks when there's no storm (0 = hold).
@@ -102,6 +112,30 @@ Optional second source (free, no key, **US only**). Pulls active **Tornado / Sev
 Thunderstorm / Hurricane / Tropical Storm** warnings from api.weather.gov and shows them as
 **purple dots**. With *override* on, an active warning outranks the weather‑model score.
 
+### Tropical cyclones — worldwide (typhoons)
+Optional source for **typhoons and hurricanes anywhere on Earth**, using **GDACS** (UN/EU,
+free, no key). This is the source to use for **Japan and the Western Pacific** and every
+other cyclone basin the US‑only NWS feed doesn't cover. When enabled it fetches active
+cyclone positions; any whose centre is within the **tracking range** is treated as a
+high‑priority target, and the camera aims at its compass bearing.
+
+- **Track tropical cyclones / typhoons** — turn the source on.
+- **Override** — when on, an in‑range cyclone outranks the local weather‑model storm score
+  (same idea as the NWS override). When off, the cyclone competes on intensity like any cell.
+- **Cyclone tracking range** (km) — how far away a cyclone's centre may be and still be
+  tracked. Typhoons are huge, so **1000–2000 km** is reasonable; the camera only needs the
+  bearing, and zoom is capped for distant systems. Default 1500 km.
+
+Active cyclones appear on the map as a spinning **🌀 marker** (the followed one spins faster
+and is larger); hover for its name, bearing, distance and intensity. If several are active,
+the one with the higher **alert level** (Green/Orange/Red) and max wind wins. Because a
+cyclone can sit far outside the scan ring, **zoom the map out** to see distant ones.
+
+> **Tornadoes outside the US:** there is no global keyless tornado‑warning feed. The camera
+> still finds tornadic supercells through the normal lightning / CAPE / precipitation
+> scoring — it just won't have a dedicated warning to override with, as the US NWS feed
+> provides. Inside the US, NWS tornado warnings are fully supported.
+
 ### Timing & smoothing
 - **Scan interval** (min): how often to re‑check. 1–2 is responsive; data refreshes ~10–15 min.
 - **Min dwell** (min): minimum time on a target before a routine switch.
@@ -124,6 +158,8 @@ service ID and the field name for each variable you want shown (blank = skip).
 - **Blue pin** = camera · **ring** = scan radius · **colored wedges** = each view/preset sector.
 - **Red dots** = detected storm cells (biggest/pulsing = the one being followed).
 - **Purple dots** = active NWS warnings.
+- **🌀 spinning markers** = active tropical cyclones (typhoons / hurricanes); may sit far
+  outside the ring — zoom out to see them.
 - **Live storm radar** overlays RainViewer precipitation (raw rain — can differ from the score).
 - **Manual pick**: tick it, then **click a red dot** to lock the camera onto that cell. It stays
   locked until you pick another or turn manual off (then it follows the strongest again).
@@ -136,6 +172,9 @@ service ID and the field name for each variable you want shown (blank = skip).
   unavailable or its quota is hit; provides precipitation + gusts (the threshold is relaxed so
   tracking continues). The active source is shown in **Live status**.
 - **NWS** (optional, US) — severe‑weather warnings.
+- **GDACS** (optional, worldwide) — tropical‑cyclone positions (typhoons / hurricanes),
+  keyless, updated every few hours. Covers Japan, the Atlantic/Pacific, Indian Ocean and
+  South Pacific basins.
 
 If the daily limit is reached, the app backs off and switches to the fallback until the quota
 resets at the next UTC midnight, then resumes automatically.

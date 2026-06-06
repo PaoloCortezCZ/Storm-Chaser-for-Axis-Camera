@@ -159,6 +159,12 @@ const DEFAULT_SETTINGS = {
     nws_enabled: false,         // fetch active NWS warnings near the camera
     nws_override: true,         // a tornado/severe/hurricane WARNING overrides storms
 
+    // Global tropical-cyclone tracking via GDACS (free, keyless, worldwide —
+    // covers Japan/Western Pacific typhoons, Atlantic/Pacific hurricanes, etc.).
+    typhoon_enabled: false,
+    typhoon_override: true,     // an in-range cyclone overrides the local storm score
+    typhoon_range_km: 1500,     // aim at cyclones whose centre is within this distance
+
     // Intensity weights + trigger
     w_lightning: 1.0,
     w_cape: 0.002,
@@ -291,7 +297,7 @@ function geomCentroid(geom) {
 async function fetchNwsAlerts(lat, lon) {
     const url = `https://api.weather.gov/alerts/active?point=${lat.toFixed(4)},${lon.toFixed(4)}&status=actual`;
     const resp = await fetch(url, {
-        headers: { 'User-Agent': 'StormChaser-CamScripter/3.0.8 (camstreamer)', Accept: 'application/geo+json' },
+        headers: { 'User-Agent': 'StormChaser-CamScripter/4.0.0 (camstreamer)', Accept: 'application/geo+json' },
         signal: AbortSignal.timeout(8000),
     });
     if (!resp.ok) throw new Error(`NWS HTTP ${resp.status}`);
@@ -306,6 +312,46 @@ async function fetchNwsAlerts(lat, lon) {
         const bearing = c ? bearingTo(lat, lon, c.lat, c.lon) : 0;
         const dist = c ? haversineKm(lat, lon, c.lat, c.lon) : 0;
         out.push({ bearing, dist, intensity: sev, event, nws: true });
+    }
+    out.sort((a, b) => b.intensity - a.intensity);
+    return out;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Global tropical cyclones (typhoons / hurricanes) via GDACS — free, keyless,
+// worldwide. Unlike the US-only NWS feed this covers Japan and every other
+// cyclone basin. Each event is a current-position point with an alert level
+// (Green/Orange/Red) and max wind speed.
+// ─────────────────────────────────────────────────────────────────────────────
+async function fetchTropicalCyclones(lat, lon) {
+    const url = 'https://www.gdacs.org/gdacsapi/api/events/geteventlist/EVENTS4APP?eventlist=TC';
+    const resp = await fetch(url, {
+        headers: { 'User-Agent': 'StormChaser-CamScripter/4.0.0 (camstreamer)', Accept: 'application/json' },
+        signal: AbortSignal.timeout(15000),
+    });
+    if (!resp.ok) throw new Error(`GDACS HTTP ${resp.status}`);
+    const data = await resp.json();
+    const feats = Array.isArray(data && data.features) ? data.features : [];
+    const range = Math.max(50, Number(settings.typhoon_range_km) || 1500);
+    const out = [];
+    for (const f of feats) {
+        const p = (f && f.properties) || {};
+        // The endpoint mixes hazard types; keep only current tropical cyclones.
+        if (String(p.eventtype) !== 'TC' || String(p.iscurrent) !== 'true') continue;
+        const c = f.geometry && f.geometry.coordinates;        // [lon, lat]
+        if (!Array.isArray(c) || c.length < 2) continue;
+        const tcLon = Number(c[0]), tcLat = Number(c[1]);
+        if (!isFinite(tcLat) || !isFinite(tcLon)) continue;
+        const dist = haversineKm(lat, lon, tcLat, tcLon);
+        if (dist > range) continue;
+        const bearing = bearingTo(lat, lon, tcLat, tcLon);
+        const lvl = String(p.alertlevel || '').toLowerCase();
+        const wind = Number(p.severitydata && p.severitydata.severity) || 0;   // km/h
+        // High base intensity so a cyclone dominates the storm score, scaled by
+        // alert level and max wind so a Red super-typhoon outranks a weak one.
+        const base = lvl === 'red' ? 90 : lvl === 'orange' ? 75 : 60;
+        const intensity = base + wind / 10;
+        out.push({ bearing, dist, intensity, event: p.eventname || p.name || 'Tropical Cyclone', tc: true });
     }
     out.sort((a, b) => b.intensity - a.intensity);
     return out;
@@ -896,7 +942,7 @@ async function scoreMetNo(grid) {
     const cap = 14;
     const step = Math.max(1, Math.ceil(grid.length / cap));
     const pts = grid.filter((_, i) => i % step === 0).slice(0, cap);
-    const headers = { 'User-Agent': 'StormChaser-CamScripter/3.0.8 (camstreamer)' };
+    const headers = { 'User-Agent': 'StormChaser-CamScripter/4.0.0 (camstreamer)' };
     const results = await Promise.all(pts.map(async (pt) => {
         try {
             const url = `https://api.met.no/weatherapi/locationforecast/2.0/compact?lat=${pt.lat.toFixed(4)}&lon=${pt.lon.toFixed(4)}`;
@@ -966,10 +1012,30 @@ async function fetchAndUpdate() {
             }
         }
 
-        // Build the red-dot list: NWS warnings first (if overriding), then storms.
-        const merged = (settings.nws_enabled && settings.nws_override)
-            ? [...alertSpots, ...scored]
-            : [...scored, ...alertSpots].sort((a, b) => b.intensity - a.intensity);
+        // Optional: global tropical cyclones (typhoons/hurricanes) via GDACS.
+        let tcSpots = [];
+        if (settings.typhoon_enabled) {
+            try {
+                tcSpots = await fetchTropicalCyclones(Number(settings.latitude), Number(settings.longitude));
+                if (tcSpots.length) addLog(`🌀 Cyclones in range: ${tcSpots.map((t) => `${t.event} (${Math.round(t.dist)} km)`).join(', ')}`);
+            } catch (e) {
+                addLog(`Tropical-cyclone feed unavailable: ${e.message}`);
+            }
+        }
+
+        // Build the red-dot list. Overriding sources (NWS warnings, tropical
+        // cyclones) are placed first so they win; otherwise everything is just
+        // sorted by intensity.
+        const overrideSpots = [
+            ...(settings.nws_enabled && settings.nws_override ? alertSpots : []),
+            ...(settings.typhoon_enabled && settings.typhoon_override ? tcSpots : []),
+        ].sort((a, b) => b.intensity - a.intensity);
+        const restSpots = [
+            ...scored,
+            ...(settings.nws_enabled && !settings.nws_override ? alertSpots : []),
+            ...(settings.typhoon_enabled && !settings.typhoon_override ? tcSpots : []),
+        ].sort((a, b) => b.intensity - a.intensity);
+        const merged = [...overrideSpots, ...restSpots];
         lastTopSpots = [];
         for (const s of merged) {
             if (s.intensity <= 0) break;
@@ -1275,7 +1341,7 @@ function startHttpServer() {
             currentPreset,
             currentStatus: lastStatus,
             presets: buildPresetTable(),
-            topSpots: lastTopSpots.map((s) => ({ bearing: Math.round(s.bearing), distance: Math.round(s.dist), intensity: Number(s.intensity.toFixed(2)), event: s.event || null })),
+            topSpots: lastTopSpots.map((s) => ({ bearing: Math.round(s.bearing), distance: Math.round(s.dist), intensity: Number(s.intensity.toFixed(2)), event: s.event || null, tc: !!s.tc })),
             manualMode,
             manualBearing,
             log: [...recentLogs],

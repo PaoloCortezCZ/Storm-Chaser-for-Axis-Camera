@@ -7,8 +7,8 @@ const PKG = 'storm_chaser';
 const API = (ep) => `/local/camscripter/proxy/${PKG}/${ep}`;
 
 const FIELDS = {
-  bool: ['enabled', 'use_cloud', 'overlay_enabled', 'nws_enabled', 'nws_override', 'ptz_pan_flip', 'cg_enabled'],
-  num: ['camera_port', 'ptz_channel', 'latitude', 'longitude', 'coverage_deg', 'center_bearing_deg',
+  bool: ['enabled', 'use_cloud', 'overlay_enabled', 'nws_enabled', 'nws_override', 'ptz_pan_flip', 'cg_enabled', 'typhoon_enabled', 'typhoon_override'],
+  num: ['camera_port', 'typhoon_range_km', 'ptz_channel', 'latitude', 'longitude', 'coverage_deg', 'center_bearing_deg',
         'home_preset', 'scan_radius_km', 'scan_rings', 'pp_count',
         'pp_preset_1', 'pp_preset_2', 'pp_preset_3', 'pp_preset_4', 'pp_preset_5', 'pp_preset_6', 'pp_preset_7', 'pp_preset_8',
         'pp_bearing_1', 'pp_bearing_2', 'pp_bearing_3', 'pp_bearing_4', 'pp_bearing_5', 'pp_bearing_6', 'pp_bearing_7', 'pp_bearing_8',
@@ -249,6 +249,20 @@ function clearDraft() {
   try { localStorage.removeItem(DRAFT_KEY); } catch {}
 }
 
+// Cache the lists fetched from the camera (view areas/presets, CamSwitcher
+// playlists) so a page refresh re-shows them without forcing a re-fetch. These
+// are just the option lists — the chosen values live in the saved settings.
+const LIST_CACHE_KEY = 'sc_lists';
+function cacheLists(patch) {
+  try {
+    const cur = JSON.parse(localStorage.getItem(LIST_CACHE_KEY) || '{}');
+    localStorage.setItem(LIST_CACHE_KEY, JSON.stringify({ ...cur, ...patch }));
+  } catch {}
+}
+function readLists() {
+  try { return JSON.parse(localStorage.getItem(LIST_CACHE_KEY) || '{}'); } catch { return {}; }
+}
+
 async function fetchSettingsWithRetry(tries = 12, delayMs = 1000) {
   // After "Save & restart" the CamScripter proxy returns 500 for ~1s while the
   // app relaunches. Retry so a refresh during that window doesn't blank the form.
@@ -279,7 +293,22 @@ async function load() {
     fill(saved);
     msg('Settings loaded.', 'ok');
   }
+  restoreCachedLists();
   draftReady = true;
+}
+
+// Re-show the last-fetched camera lists (view areas/presets, CamSwitcher
+// playlists) after a refresh, without overwriting saved selections.
+function restoreCachedLists() {
+  const c = readLists();
+  try {
+    if (Array.isArray(c.viewAreas) && c.viewAreas.length) renderViewAreas(c.viewAreas, false);
+    if (Array.isArray(c.playlists) && c.playlists.length) { csPlaylists = c.playlists; populatePlaylistPickers(); }
+    // Pre-select each picker to match the saved value so the dropdowns reflect
+    // the current assignment (not just the hidden value/url fields).
+    for (let i = 1; i <= 8; i++) { const pk = $(`pp_pick_${i}`), v = $(`pp_preset_${i}`); if (pk && v) pk.value = String(v.value || ''); }
+    for (let i = 1; i <= 5; i++) { const pk = $(`cs_view_${i}_pick`), u = $(`cs_view_${i}_url`); if (pk && u) pk.value = String(u.value || ''); }
+  } catch {}
 }
 
 // Reload button = discard the draft and pull the saved settings from the camera.
@@ -557,6 +586,18 @@ function updateStormMarkers(spots, activeBearing, manualOn) {
   spots.forEach((s) => {
     const p = destPoint(lat, lon, Number(s.bearing), Number(s.distance) || 0);
     const isActive = hiBearing != null && Math.abs(((s.bearing - hiBearing + 540) % 360) - 180) < 8;
+    // Tropical cyclones: spinning 🌀 marker (cyan). NWS alerts: purple. Storms: red.
+    if (s.tc) {
+      const size = isActive ? 34 : 28;
+      const inner = `<div class="tc-marker${isActive ? ' tc-active' : ''}" style="width:${size}px;height:${size}px;cursor:${manualOn ? 'pointer' : 'default'}">🌀</div>`;
+      const m = L.marker(p, {
+        riseOnHover: true, zIndexOffset: isActive ? 1200 : 200,
+        icon: L.divIcon({ className: '', iconSize: [size, size], iconAnchor: [size / 2, size / 2], html: inner }),
+      }).addTo(map).bindTooltip(`🌀 ${s.event || 'Tropical cyclone'} · ${Math.round(s.bearing)}° ${compass(s.bearing)} · ${Math.round(dispDist(s.distance))} ${distUnit()} · intensity ${s.intensity.toFixed(1)}${isActive ? ' · FOLLOWING' : ''}${manualOn ? ' · click to lock' : ''}`);
+      if (manualOn) m.on('click', () => setManual(true, s.bearing));
+      stormLayers.push(m);
+      return;
+    }
     const col = s.event ? '#9333ea' : '#d9342b';                 // NWS alerts purple, storms red
     const glow = s.event ? '147,51,234' : '217,52,43';
     const base = 11 + Math.round(10 * (s.intensity / maxI));     // 11–21px by strength
@@ -761,7 +802,7 @@ function populatePresetPickers(presets) {
   document.querySelectorAll('.pppick').forEach((s) => { const cur = s.value; s.innerHTML = opts; s.value = cur; s.style.display = 'block'; });
 }
 
-function renderViewAreas(viewAreas) {
+function renderViewAreas(viewAreas, apply = true) {
   lastViewAreas = viewAreas || [];
   const sel = $('viewarea_select');
   sel.innerHTML = '';
@@ -777,7 +818,18 @@ function renderViewAreas(viewAreas) {
     const ch = num($('ptz_channel').value);
     const idx = Math.max(0, lastViewAreas.findIndex((v) => v.camera === ch));
     sel.value = String(idx);
-    applyViewArea(lastViewAreas[idx]);
+    if (apply) {
+      // Fresh fetch: apply the selected view area (fills the preset fields).
+      applyViewArea(lastViewAreas[idx]);
+    } else {
+      // Restore from cache: show the picker options + preset list, but DON'T
+      // overwrite the user's saved preset assignments.
+      const va = lastViewAreas[idx];
+      populatePresetPickers(va.presets);
+      $('presetList').innerHTML = va.presets.length
+        ? 'Presets: ' + va.presets.map((p) => `<b>${p.no}</b>·${p.name || '—'}`).join(' &nbsp; ')
+        : 'No presets defined on this view area.';
+    }
   }
 }
 
@@ -801,6 +853,7 @@ async function fetchPresets() {
     if (!j.ok) { presetMsg('✗ ' + (j.error || 'failed')); return; }
     const total = (j.viewAreas || []).reduce((n, v) => n + v.presets.length, 0);
     renderViewAreas(j.viewAreas);
+    cacheLists({ viewAreas: j.viewAreas || [] });
     presetMsg(`✓ ${j.viewAreas.length} view area(s), ${total} preset(s)`);
   } catch (e) {
     presetMsg('✗ ' + e);
@@ -923,6 +976,7 @@ async function fetchPlaylists() {
     }
     csPlaylists = j.playlists || [];
     populatePlaylistPickers();
+    cacheLists({ playlists: csPlaylists });
     const cams = csPlaylists.filter((p) => p.type === 'camera').length;
     const pls = csPlaylists.filter((p) => p.type === 'playlist').length;
     $('csFetchMsg').textContent = `✓ ${csPlaylists.length} found (${cams} camera, ${pls} playlist)`;

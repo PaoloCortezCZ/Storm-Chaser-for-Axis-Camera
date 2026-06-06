@@ -148,6 +148,15 @@
   }
   .storm-active { animation: stormPulse 1.6s ease-out infinite; }
 
+  /* Tropical-cyclone marker: a slowly spinning 🌀 with a cyan halo. */
+  @keyframes tcSpin { to { transform: rotate(360deg); } }
+  .tc-marker { display:flex; align-items:center; justify-content:center; line-height:1;
+    font-size:20px; border-radius:50%; background:rgba(8,145,178,.18);
+    border:2px solid #0891b2; box-shadow:0 0 8px rgba(8,145,178,.6);
+    animation: tcSpin 6s linear infinite; }
+  .tc-marker.tc-active { font-size:24px; border-width:3px; box-shadow:0 0 12px rgba(8,145,178,.9);
+    animation: tcSpin 3s linear infinite; }
+
   /* CamSwitcher view rows — clean bordered mini-panels with a color accent. */
   .csrow { display: grid; grid-template-columns: auto 78px 1fr; gap: 10px; align-items: end;
     background: var(--panel-2); border: 1px solid var(--border); border-left-width: 4px;
@@ -333,7 +342,7 @@
       </div>
       <div id="map" style="height:300px;border-radius:10px;border:1px solid var(--border);margin:8px 0;overflow:hidden"></div>
       <div class="compass-wrap" id="compassFallback" style="display:none"><canvas id="compass" width="240" height="240"></canvas></div>
-      <p class="hint">Blue pin = camera · ring = scan radius · colored wedges = each view/preset's sector · <span style="color:#d9342b;font-weight:700">red dot = the storm cell the app detected as strongest</span> (this is what drives the switch). Note the red dot reflects the intensity score (lightning/CAPE/precip), which may differ from the raw radar rain you see. Radar © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>, map © OpenStreetMap.</p>
+      <p class="hint">Blue pin = camera · ring = scan radius · colored wedges = each view/preset's sector · <span style="color:#d9342b;font-weight:700">red dot = strongest storm cell</span> · <span style="color:#9333ea;font-weight:700">purple = NWS warning</span> · <span style="color:#0891b2;font-weight:700">🌀 = tropical cyclone</span> (this is what drives the switch). Note the red dot reflects the intensity score (lightning/CAPE/precip), which may differ from the raw radar rain you see. Cyclones can sit far outside the scan ring — zoom out to see them. Radar © <a href="https://www.rainviewer.com/" target="_blank" rel="noopener">RainViewer</a>, map © OpenStreetMap.</p>
       <table id="presetTable"><thead><tr><th>Preset #</th><th>Center bearing</th><th>Direction</th></tr></thead><tbody></tbody></table>
     </div>
 
@@ -385,7 +394,20 @@
       </div>
       <div class="check"><input type="checkbox" id="nws_enabled"><label for="nws_enabled" style="margin:0">Use NWS severe-weather warnings (US)</label></div>
       <div class="check"><input type="checkbox" id="nws_override"><label for="nws_override" style="margin:0">Warnings override the storm score</label></div>
-      <p class="hint">Source: api.weather.gov · covers tornadoes, severe thunderstorms, hurricanes &amp; tropical storms. For typhoons/cyclones outside US waters there is no free keyless feed.</p>
+      <p class="hint">Source: api.weather.gov · covers tornadoes, severe thunderstorms, hurricanes &amp; tropical storms in the United States. For typhoons elsewhere (Japan, Asia-Pacific…), use the tropical-cyclone source below.</p>
+    </div>
+
+    <div class="card">
+      <h2>Tropical cyclones — worldwide (typhoons) <button class="infobtn" type="button" aria-label="info">i</button></h2>
+      <div class="cardinfo">
+        <p>Tracks active <b>typhoons and hurricanes anywhere on Earth</b> using <b>GDACS</b> (UN/EU, free, no key) — this is the source to use for <b>Japan and the Western Pacific</b> and every other cyclone basin. When a cyclone's centre is within range, the app aims the camera at its bearing and shows it as a high-priority target. Alert level (Green/Orange/Red) and max wind decide which cyclone wins if several are active.</p>
+        <p>With <b>override</b> on, an in-range cyclone outranks the local weather-model storm score. <b>Range</b> is how far away a cyclone centre can be and still be tracked — typhoons are huge, so 1000–2000 km is reasonable (the camera only needs the bearing; zoom is capped for distant cells).</p>
+        <p><b>Tornadoes outside the US:</b> there is no global keyless tornado-warning feed. The camera still finds tornadic supercells through the normal lightning/CAPE/precipitation scoring — just without a dedicated warning to override it.</p>
+      </div>
+      <div class="check"><input type="checkbox" id="typhoon_enabled"><label for="typhoon_enabled" style="margin:0">Track tropical cyclones / typhoons (worldwide)</label></div>
+      <div class="check"><input type="checkbox" id="typhoon_override"><label for="typhoon_override" style="margin:0">In-range cyclone overrides the storm score</label></div>
+      <label>Cyclone tracking range (km)</label><input id="typhoon_range_km" type="number" min="50" max="6000" />
+      <p class="hint">Source: gdacs.org · global tropical-cyclone positions, updated every few hours. Covers Japan (typhoons), the Atlantic/Pacific hurricanes, Indian Ocean & South Pacific cyclones.</p>
     </div>
 
     <div class="card">

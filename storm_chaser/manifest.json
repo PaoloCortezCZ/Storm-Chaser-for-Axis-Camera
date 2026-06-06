@@ -1,7 +1,7 @@
 {
   "package_name": "storm_chaser",
   "package_menu_name": "Storm Chaser",
-  "package_version": "3.0.8",
+  "package_version": "4.0.0",
   "vendor": "Pavel Kotyza",
   "required_camscripter_version": "1.5.3",
   "ui_link": "/local/camscripter/package/storm_chaser/index.html"
